@@ -7,8 +7,8 @@ import { useEffect, useState } from "react";
 import AvatarBanner from "@/components/navigation/AvatarBanner";
 import Marquee from "@/components/ui/marquee"
 import { isCanteenOpen } from "@/lib/utils";
-import { useDebounce } from "@/lib/hooks"; // Import the debounce hook
-import { ArrowDownAZ, ArrowUpZA, CheckIcon, ChevronsUpDown, SortAsc, Leaf, Beef, ThumbsUp, ThumbsDown, Search, Utensils } from "lucide-react";
+import { useDebounce } from "@/lib/hooks";
+import { ArrowDownAZ, ArrowUpZA, CheckIcon, ChevronsUpDown, SortAsc, Leaf, Drumstick , ThumbsUp, ThumbsDown, Search, Utensils } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   Command,
@@ -286,8 +286,8 @@ export default function CanteenPage() {
   };
 
   return (
-    <div className="relative p-6 flex flex-col min-h-screen">
-      <div className="mx-9 mr-18">
+    <div className="relative p-2 sm:p-6 flex flex-col min-h-screen">
+      <div className="mx-2 mr-18">
 
         <SwitchButton />
 
@@ -305,30 +305,30 @@ export default function CanteenPage() {
           )}
 
           {selectedCanteen && (
-            <div className="flex flex-col items-center mt-6 mb-12">
-              <div className="border-4 border-black shadow-shadow bg-main text-main-foreground p-6 max-w-md w-full rounded-lg transform rotate-1">
-                <h1 className="text-3xl font-heading text-center mb-4">{selectedCanteen.name}</h1>
+            <div className="flex flex-col items-center mt-4 sm:mt-6 mb-8 sm:mb-12">
+              <div className="border-4 border-black shadow-shadow bg-main text-main-foreground p-4 sm:p-6 w-full max-w-md rounded-lg transform rotate-1">
+                <h1 className="text-2xl sm:text-3xl font-heading text-center mb-4">{selectedCanteen.name}</h1>
 
                 {selectedCanteen.timings && (
                   <div className="flex flex-col items-center">
-                    <p className="text-lg font-base mb-2">Hours: {selectedCanteen.timings}</p>
+                    <p className="text-base sm:text-lg font-base mb-2">Hours: {selectedCanteen.timings}</p>
                     {isCanteenOpen(selectedCanteen.timings) ? (
-                      <p className="text-xl font-heading px-3 py-1 bg-secondary-background rounded-md border-2 border-black">OPEN NOW</p>
+                      <p className="text-lg sm:text-xl font-heading px-3 py-1 bg-secondary-background rounded-md border-2 border-black">OPEN NOW</p>
                     ) : (
-                      <p className="text-xl font-heading px-3 py-1 bg-background rounded-md border-2 border-black">CLOSED</p>
+                      <p className="text-lg sm:text-xl font-heading px-3 py-1 bg-background rounded-md border-2 border-black">CLOSED</p>
                     )}
                   </div>
                 )}
               </div>
 
-              {/* Filters Section - Moved below canteen info card */}
-              <div className="flex flex-col mt-8 mb-4 max-w-4xl mx-auto w-full bg-secondary-background rounded-lg p-6 border-2 border-border">
-                <h2 className="text-xl font-heading mb-4 text-center">Filters & Search</h2>
+              {/* Filters Section - Responsive improvements */}
+              <div className="flex flex-col mt-6 sm:mt-8 mb-4 w-full max-w-4xl mx-auto bg-secondary-background rounded-lg p-3 sm:p-6 border-2 border-border">
+                <h2 className="text-lg sm:text-xl font-heading mb-3 sm:mb-4 text-center">Filters & Search</h2>
 
-                {/* Search input - Updated to use searchInputValue state */}
-                <div className="mb-4">
+                {/* Search input */}
+                <div className="mb-3 sm:mb-4">
                   <div className="relative">
-                    <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-foreground/50 size-5" />
+                    <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-foreground/50 size-4 sm:size-5" />
                     <Input
                       placeholder="Search menu items..."
                       value={searchInputValue}
@@ -338,9 +338,9 @@ export default function CanteenPage() {
                   </div>
                 </div>
 
-                <div className="flex flex-wrap gap-4">
+                <div className="flex flex-col sm:flex-row gap-3 sm:gap-4">
                   {/* Category Selection Dropdown */}
-                  <div className="flex-1 min-w-[250px]">
+                  <div className="w-full sm:flex-1">
                     <p className="text-sm font-medium mb-1">Filter by category:</p>
                     <Popover open={openCategoryDropdown} onOpenChange={setOpenCategoryDropdown}>
                       <PopoverTrigger asChild>
@@ -351,9 +351,11 @@ export default function CanteenPage() {
                           className="w-full justify-between bg-main text-main-foreground border-2 border-black"
                         >
                           {selectedCategories.length > 0
-                            ? selectedCategories.map((category) => category.label).join(", ")
+                            ? selectedCategories.length > 1 
+                              ? `${selectedCategories.length} categories selected`
+                              : selectedCategories[0].label
                             : "Select categories..."}
-                          <ChevronsUpDown className="text-muted-foreground" />
+                          <ChevronsUpDown className="ml-1 text-muted-foreground size-4" />
                         </Button>
                       </PopoverTrigger>
                       <PopoverContent className="w-full p-0 border-0" align="start">
@@ -394,8 +396,8 @@ export default function CanteenPage() {
                     </Popover>
                   </div>
 
-                  {/* Sort Dropdown - Now using Select component */}
-                  <div className="flex-1 min-w-[250px]">
+                  {/* Sort Dropdown */}
+                  <div className="w-full sm:flex-1">
                     <p className="text-sm font-medium mb-1">Sort by:</p>
                     <Select value={selectedSort} onValueChange={setSelectedSort}>
                       <SelectTrigger className="w-full bg-main text-main-foreground border-2 border-black">
@@ -432,8 +434,8 @@ export default function CanteenPage() {
                   </div>
                 </div>
 
-                {/* Vegetarian/Non-vegetarian switches - Center aligned */}
-                <div className="mt-6 flex justify-center gap-8">
+                {/* Vegetarian/Non-vegetarian switches - Responsive improvements */}
+                <div className="mt-4 sm:mt-6 flex flex-wrap justify-center gap-4 sm:gap-8">
                   <div className="flex items-center space-x-2">
                     <Switch
                       id="veg-mode"
@@ -453,7 +455,7 @@ export default function CanteenPage() {
                       onCheckedChange={setIsNonVeg}
                     />
                     <label htmlFor="non-veg-mode" className="text-sm font-medium cursor-pointer flex items-center gap-1">
-                      <Beef className="size-4 text-red-600" />
+                      <Drumstick  className="size-4 text-red-600" />
                       <span>Non-Vegetarian</span>
                     </label>
                   </div>
@@ -461,10 +463,10 @@ export default function CanteenPage() {
               </div>
 
               {/* Menu Items Display */}
-              <div className="mt-8 w-full max-w-4xl">
-                <h2 className="text-2xl font-heading mb-4">Menu Items</h2>
+              <div className="mt-6 sm:mt-8 w-full max-w-4xl">
+                <h2 className="text-xl sm:text-2xl font-heading mb-3 sm:mb-4">Menu Items</h2>
                 {filteredMenuItems.length > 0 ? (
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6">
                     {filteredMenuItems.map((item) => (
                       <Card key={item.id} className="relative overflow-hidden hover:shadow-lg transition-all duration-300">
                         <div className="absolute left-0 top-1/2 -translate-y-1/2 flex flex-col items-center p-1 bg-secondary-background border-r-2 border-y-2 border-border rounded-r-md">
@@ -472,37 +474,37 @@ export default function CanteenPage() {
                             variant="noShadow"
                             size="icon"
                             onClick={() => handleVote(item.id, 1)}
-                            className="h-8 w-8"
+                            className="h-7 w-7 sm:h-8 sm:w-8"
                             disabled={isVoting}
                           >
-                            <ThumbsUp className="size-4" />
+                            <ThumbsUp className="size-3 sm:size-4" />
                           </Button>
-                          <span className="text-sm font-bold">{item.votes || 0}</span>
+                          <span className="text-xs sm:text-sm font-bold">{item.votes || 0}</span>
                           <Button
                             variant="noShadow"
                             size="icon"
                             onClick={() => handleVote(item.id, -1)}
-                            className="h-8 w-8"
+                            className="h-7 w-7 sm:h-8 sm:w-8"
                             disabled={isVoting}
                           >
-                            <ThumbsDown className="size-4" />
+                            <ThumbsDown className="size-3 sm:size-4" />
                           </Button>
                         </div>
 
                         <div className="ml-10 flex">
                           <div className="flex-1">
-                            <CardHeader>
-                              <div className="flex items-center justify-between">
-                                <CardTitle className="text-lg">
+                            <CardHeader className="p-3 sm:p-6">
+                              <div className="flex items-center justify-between flex-wrap gap-2">
+                                <CardTitle className="text-base sm:text-lg">
                                   <div className="flex items-center gap-2">
                                     {item.name}
                                     {item.is_nonveg ?
-                                      <Beef className="size-4 text-red-600" /> :
+                                      <Drumstick  className="size-4 text-red-600" /> :
                                       <Leaf className="size-4 text-green-600" />
                                     }
                                   </div>
                                 </CardTitle>
-                                <div className="font-bold text-lg">₹{item.price.toFixed(2)}</div>
+                                <div className="font-bold text-base sm:text-lg">₹{item.price.toFixed(2)}</div>
                               </div>
                               <CardDescription className="flex items-center gap-1">
                                 <Utensils className="size-3" />
@@ -511,13 +513,13 @@ export default function CanteenPage() {
                             </CardHeader>
 
                             {item.description && (
-                              <CardContent>
-                                <p className="text-sm">{item.description}</p>
+                              <CardContent className="p-3 sm:p-6 pt-0">
+                                <p className="text-xs sm:text-sm">{item.description}</p>
                               </CardContent>
                             )}
                           </div>
 
-                          <div className="w-24 h-24 flex items-center justify-center bg-secondary-background/50 rounded-md border border-border mx-4 my-auto overflow-hidden">
+                          <div className="w-16 h-16 sm:w-24 sm:h-24 flex items-center justify-center bg-secondary-background/50 rounded-md border border-border mx-2 sm:mx-4 my-auto overflow-hidden">
                             {/* Placeholder for food image */}
                             <div className="text-xs text-center text-foreground/60">Food Image</div>
                           </div>
@@ -526,24 +528,23 @@ export default function CanteenPage() {
                     ))}
                   </div>
                 ) : (
-                  <div className="text-center p-8 border-2 border-dashed border-border rounded-base">
+                  <div className="text-center p-4 sm:p-8 border-2 border-dashed border-border rounded-base">
                     <p>No menu items found with the selected filters.</p>
                   </div>
                 )}
               </div>
             </div>
           )}
-
         </div>
 
         {!loading && !selectedCanteen && (
-          <div className="flex flex-col gap-8 justify-center items-center min-h-[50vh]">
+          <div className="flex flex-col gap-4 sm:gap-8 justify-center items-center min-h-[50vh]">
             <Marquee items={[...canteens].sort(() => 0.5 - Math.random()).map(canteen => canteen.name.toUpperCase())} />
             <Marquee items={[...canteens].sort(() => 0.5 - Math.random()).map(canteen => canteen.name.toUpperCase())} />
             <Marquee items={[...canteens].sort(() => 0.5 - Math.random()).map(canteen => canteen.name.toUpperCase())} />
 
-            <div className="flex justify-center items-center my-auto py-12">
-              <div className="text-5xl font-bold p-6 border-4 border-black bg-chart-1 text-main-foreground transform rotate-1 text-center max-w-md relative overflow-hidden"
+            <div className="flex justify-center items-center my-auto py-8 sm:py-12">
+              <div className="text-3xl sm:text-5xl font-bold p-4 sm:p-6 border-4 border-black bg-chart-1 text-main-foreground transform rotate-1 text-center max-w-md relative overflow-hidden"
                 style={{
                   backgroundImage: `radial-gradient(circle, rgba(0, 0, 0, 0.2) 1px, transparent 1px)`,
                   backgroundSize: `12px 12px`,
