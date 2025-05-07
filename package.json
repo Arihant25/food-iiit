@@ -9,11 +9,17 @@
     "lint": "next lint"
   },
   "dependencies": {
+    "@radix-ui/react-avatar": "^1.1.9",
+    "@radix-ui/react-dialog": "^1.1.13",
+    "@radix-ui/react-popover": "^1.1.13",
     "@radix-ui/react-slot": "^1.2.2",
     "@radix-ui/react-switch": "^1.2.4",
+    "@supabase/supabase-js": "^2.49.4",
     "@types/xml2js": "^0.4.14",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
+    "cmdk": "^1.1.1",
+    "dotenv": "^16.5.0",
     "framer-motion": "^12.10.0",
     "lucide-react": "^0.507.0",
     "next": "15.3.1",

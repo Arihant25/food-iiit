@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 
 export const metadata: Metadata = {
   title: "Food@IIIT",
-  description: "The one stop shop foe all things food at IIIT Hyderabad",
+  description: "The one stop shop for all things food at IIIT Hyderabad",
 };
 
 export default function Home() {

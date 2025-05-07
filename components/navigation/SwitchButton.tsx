@@ -60,7 +60,7 @@ export default function SwitchButton() {
                 >
                     <div className="h-full w-full flex items-center justify-center">
                         <span className={`transform ${isCanteenPage ? "rotate-270" : "rotate-90"} text-lg whitespace-nowrap`}>
-                            {isCanteenPage ? "Switch to Mess" : "Switch to Canteen"}
+                            {isCanteenPage ? "SWITCH TO MESS" : "SWITCH TO CANTEEN"}
                         </span>
                     </div>
                 </Button>
