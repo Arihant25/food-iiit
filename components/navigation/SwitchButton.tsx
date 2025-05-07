@@ -55,7 +55,7 @@ export default function SwitchButton() {
             >
                 <Button
                     variant="default"
-                    className="h-full w-12 p-0 rounded-none"
+                    className="h-full w-12 p-0 rounded-none cursor-pointer"
                     onClick={handleSwitchClick}
                 >
                     <div className="h-full w-full flex items-center justify-center">

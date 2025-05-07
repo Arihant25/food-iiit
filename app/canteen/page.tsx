@@ -8,7 +8,7 @@ import AvatarBanner from "@/components/navigation/AvatarBanner";
 import Marquee from "@/components/ui/marquee"
 import { isCanteenOpen } from "@/lib/utils";
 import { useDebounce } from "@/lib/hooks";
-import { ArrowDownAZ, ArrowUpZA, CheckIcon, ChevronsUpDown, SortAsc, Leaf, Drumstick , ThumbsUp, ThumbsDown, Search, Utensils } from "lucide-react";
+import { ArrowDownAZ, ArrowUpZA, CheckIcon, ChevronsUpDown, SortAsc, Leaf, Drumstick, ThumbsUp, ThumbsDown, Search, Utensils } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   Command,
@@ -50,12 +50,6 @@ interface Canteen {
 interface Category {
   value: string;
   label: string;
-}
-
-interface SortOption {
-  value: string;
-  label: string;
-  icon: React.ReactNode;
 }
 
 export default function CanteenPage() {
@@ -287,7 +281,7 @@ export default function CanteenPage() {
 
   return (
     <div className="relative p-2 sm:p-6 flex flex-col min-h-screen">
-      <div className="mx-2 mr-18">
+      <div className="mx-2 mr-14 mb-10">
 
         <SwitchButton />
 
@@ -306,8 +300,8 @@ export default function CanteenPage() {
 
           {selectedCanteen && (
             <div className="flex flex-col items-center mt-4 sm:mt-6 mb-8 sm:mb-12">
-              <div className="border-4 border-black shadow-shadow bg-main text-main-foreground p-4 sm:p-6 w-full max-w-md rounded-lg transform rotate-1">
-                <h1 className="text-2xl sm:text-3xl font-heading text-center mb-4">{selectedCanteen.name}</h1>
+              <div className="border-4 border-black shadow-shadow bg-main text-main-foreground p-4 w-full max-w-md rounded-lg transform rotate-1">
+                <h1 className="text-4xl sm:text-5xl font-heading text-center mb-4">{selectedCanteen.name}</h1>
 
                 {selectedCanteen.timings && (
                   <div className="flex flex-col items-center">
@@ -321,7 +315,7 @@ export default function CanteenPage() {
                 )}
               </div>
 
-              {/* Filters Section - Responsive improvements */}
+              {/* Filters Section */}
               <div className="flex flex-col mt-6 sm:mt-8 mb-4 w-full max-w-4xl mx-auto bg-secondary-background rounded-lg p-3 sm:p-6 border-2 border-border">
                 <h2 className="text-lg sm:text-xl font-heading mb-3 sm:mb-4 text-center">Filters & Search</h2>
 
@@ -351,7 +345,7 @@ export default function CanteenPage() {
                           className="w-full justify-between bg-main text-main-foreground border-2 border-black"
                         >
                           {selectedCategories.length > 0
-                            ? selectedCategories.length > 1 
+                            ? selectedCategories.length > 1
                               ? `${selectedCategories.length} categories selected`
                               : selectedCategories[0].label
                             : "Select categories..."}
@@ -434,7 +428,7 @@ export default function CanteenPage() {
                   </div>
                 </div>
 
-                {/* Vegetarian/Non-vegetarian switches - Responsive improvements */}
+                {/* Vegetarian/Non-vegetarian switches */}
                 <div className="mt-4 sm:mt-6 flex flex-wrap justify-center gap-4 sm:gap-8">
                   <div className="flex items-center space-x-2">
                     <Switch
@@ -444,7 +438,7 @@ export default function CanteenPage() {
                     />
                     <label htmlFor="veg-mode" className="text-sm font-medium cursor-pointer flex items-center gap-1">
                       <Leaf className="size-4 text-green-600" />
-                      <span>Vegetarian</span>
+                      <span>Veg</span>
                     </label>
                   </div>
 
@@ -455,76 +449,81 @@ export default function CanteenPage() {
                       onCheckedChange={setIsNonVeg}
                     />
                     <label htmlFor="non-veg-mode" className="text-sm font-medium cursor-pointer flex items-center gap-1">
-                      <Drumstick  className="size-4 text-red-600" />
-                      <span>Non-Vegetarian</span>
+                      <Drumstick className="size-4 text-red-600" />
+                      <span>Non-Veg</span>
                     </label>
                   </div>
                 </div>
               </div>
 
               {/* Menu Items Display */}
-              <div className="mt-6 sm:mt-8 w-full max-w-4xl">
-                <h2 className="text-xl sm:text-2xl font-heading mb-3 sm:mb-4">Menu Items</h2>
+              <div className="w-full max-w-4xl">
                 {filteredMenuItems.length > 0 ? (
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6">
-                    {filteredMenuItems.map((item) => (
-                      <Card key={item.id} className="relative overflow-hidden hover:shadow-lg transition-all duration-300">
-                        <div className="absolute left-0 top-1/2 -translate-y-1/2 flex flex-col items-center p-1 bg-secondary-background border-r-2 border-y-2 border-border rounded-r-md">
-                          <Button
-                            variant="noShadow"
-                            size="icon"
-                            onClick={() => handleVote(item.id, 1)}
-                            className="h-7 w-7 sm:h-8 sm:w-8"
-                            disabled={isVoting}
-                          >
-                            <ThumbsUp className="size-3 sm:size-4" />
-                          </Button>
-                          <span className="text-xs sm:text-sm font-bold">{item.votes || 0}</span>
-                          <Button
-                            variant="noShadow"
-                            size="icon"
-                            onClick={() => handleVote(item.id, -1)}
-                            className="h-7 w-7 sm:h-8 sm:w-8"
-                            disabled={isVoting}
-                          >
-                            <ThumbsDown className="size-3 sm:size-4" />
-                          </Button>
-                        </div>
+                  <div className="space-y-8">
+                    {/* Group items by category */}
+                    {Array.from(new Set(filteredMenuItems.map(item => item.category))).sort().map(category => (
+                      <div key={category} className="space-y-4">
+                        <h2 className="text-2xl sm:text-3xl font-bold text-center border-b-4 border-border pb-2 my-12 mb-8">{category}</h2>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6">
+                          {filteredMenuItems
+                            .filter(item => item.category === category)
+                            .map((item) => (
+                              <Card key={item.id} className="relative overflow-hidden hover:shadow-lg transition-all duration-300">
+                                <div className="absolute left-0 top-1/2 -translate-y-1/2 flex flex-col items-center p-1 rounded-r-md">
+                                  <Button
+                                    variant="noShadow"
+                                    size="icon"
+                                    onClick={() => handleVote(item.id, 1)}
+                                    className="h-7 w-7 sm:h-8 sm:w-8"
+                                    disabled={isVoting}
+                                  >
+                                    ▲
+                                  </Button>
+                                  <span className="text-md sm:text-lg font-bold">{item.votes || 0}</span>
+                                  <Button
+                                    variant="noShadow"
+                                    size="icon"
+                                    onClick={() => handleVote(item.id, -1)}
+                                    className="h-7 w-7 sm:h-8 sm:w-8"
+                                    disabled={isVoting}
+                                  >
+                                    ▼
+                                  </Button>
+                                </div>
 
-                        <div className="ml-10 flex">
-                          <div className="flex-1">
-                            <CardHeader className="p-3 sm:p-6">
-                              <div className="flex items-center justify-between flex-wrap gap-2">
-                                <CardTitle className="text-base sm:text-lg">
-                                  <div className="flex items-center gap-2">
-                                    {item.name}
-                                    {item.is_nonveg ?
-                                      <Drumstick  className="size-4 text-red-600" /> :
-                                      <Leaf className="size-4 text-green-600" />
-                                    }
+                                <div className="ml-10 flex">
+                                  <div className="flex-1">
+                                    <CardHeader className="p-3 sm:p-6">
+                                      <div className="flex items-center justify-between flex-wrap gap-2">
+                                        <CardTitle className="text-base sm:text-lg">
+                                          <div className="flex items-center gap-2">
+                                            {item.name}
+                                            {item.is_nonveg ?
+                                              <Drumstick className="size-4 text-red-600" /> :
+                                              <Leaf className="size-4 text-green-600" />
+                                            }
+                                          </div>
+                                        </CardTitle>
+                                        <div className="font-bold text-base sm:text-lg">₹{item.price.toFixed(2)}</div>
+                                      </div>
+                                    </CardHeader>
+
+                                    {item.description && (
+                                      <CardContent className="p-3 sm:p-6 pt-0">
+                                        <p className="text-xs sm:text-sm">{item.description}</p>
+                                      </CardContent>
+                                    )}
                                   </div>
-                                </CardTitle>
-                                <div className="font-bold text-base sm:text-lg">₹{item.price.toFixed(2)}</div>
-                              </div>
-                              <CardDescription className="flex items-center gap-1">
-                                <Utensils className="size-3" />
-                                {item.category}
-                              </CardDescription>
-                            </CardHeader>
 
-                            {item.description && (
-                              <CardContent className="p-3 sm:p-6 pt-0">
-                                <p className="text-xs sm:text-sm">{item.description}</p>
-                              </CardContent>
-                            )}
-                          </div>
-
-                          <div className="w-16 h-16 sm:w-24 sm:h-24 flex items-center justify-center bg-secondary-background/50 rounded-md border border-border mx-2 sm:mx-4 my-auto overflow-hidden">
-                            {/* Placeholder for food image */}
-                            <div className="text-xs text-center text-foreground/60">Food Image</div>
-                          </div>
+                                  <div className="w-16 h-16 sm:w-24 sm:h-24 flex items-center justify-center bg-secondary-background/50 rounded-md border border-border mx-2 sm:mx-4 my-auto overflow-hidden">
+                                    {/* Placeholder for food image */}
+                                    <div className="text-xs text-center text-foreground/60">Food Image</div>
+                                  </div>
+                                </div>
+                              </Card>
+                            ))}
                         </div>
-                      </Card>
+                      </div>
                     ))}
                   </div>
                 ) : (
@@ -541,7 +540,6 @@ export default function CanteenPage() {
           <div className="flex flex-col gap-4 sm:gap-8 justify-center items-center min-h-[50vh]">
             <Marquee items={[...canteens].sort(() => 0.5 - Math.random()).map(canteen => canteen.name.toUpperCase())} />
             <Marquee items={[...canteens].sort(() => 0.5 - Math.random()).map(canteen => canteen.name.toUpperCase())} />
-            <Marquee items={[...canteens].sort(() => 0.5 - Math.random()).map(canteen => canteen.name.toUpperCase())} />
 
             <div className="flex justify-center items-center my-auto py-8 sm:py-12">
               <div className="text-3xl sm:text-5xl font-bold p-4 sm:p-6 border-4 border-black bg-chart-1 text-main-foreground transform rotate-1 text-center max-w-md relative overflow-hidden"
@@ -556,7 +554,6 @@ export default function CanteenPage() {
               </div>
             </div>
 
-            <Marquee items={[...canteens].sort(() => 0.5 - Math.random()).map(canteen => canteen.name.toUpperCase())} />
             <Marquee items={[...canteens].sort(() => 0.5 - Math.random()).map(canteen => canteen.name.toUpperCase())} />
             <Marquee items={[...canteens].sort(() => 0.5 - Math.random()).map(canteen => canteen.name.toUpperCase())} />
           </div>
