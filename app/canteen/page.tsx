@@ -74,6 +74,7 @@ export default function CanteenPage() {
   const searchQuery = useDebounce(searchInputValue, 300);
   const [isVoting, setIsVoting] = useState(false);
   const userName = session?.user?.name || "Anonymous User";
+  const [allCanteensMap, setAllCanteensMap] = useState<Record<string, Canteen>>({});
 
   // We'll track active subscriptions to clean them up when needed
   const [supabaseSubscription, setSupabaseSubscription] = useState<any>(null);
@@ -101,6 +102,13 @@ export default function CanteenPage() {
             a.name.localeCompare(b.name)
           );
           setCanteens(sortedCanteens as Canteen[]);
+
+          // Create a map of canteen IDs to canteen data for easy lookup
+          const canteenMap: Record<string, Canteen> = {};
+          sortedCanteens.forEach((canteen: Canteen) => {
+            canteenMap[canteen.id] = canteen;
+          });
+          setAllCanteensMap(canteenMap);
         }
       } catch (error: any) {
         setError(error.message);
@@ -234,47 +242,49 @@ export default function CanteenPage() {
     setFilteredMenuItems(result);
   }, [menuItems, selectedCategories, selectedSort, isVeg, isNonVeg, searchQuery]);
 
-  // Set up Supabase real-time subscription
+  // Set up Supabase real-time subscription for all canteens
   useEffect(() => {
-    if (!selectedCanteen) {
-      // Clean up any existing subscription when canteen changes
-      if (supabaseSubscription) {
-        supabase.removeChannel(supabaseSubscription);
-        setSupabaseSubscription(null);
-      }
-      return;
+    // Clean up any existing subscription when component re-mounts
+    if (supabaseSubscription) {
+      supabase.removeChannel(supabaseSubscription);
+      setSupabaseSubscription(null);
     }
 
-    // Create a new subscription for the current canteen
+    // Create a global subscription for all menu items
     const channel = supabase
-      .channel(`menu-votes-${selectedCanteen.id}`)
+      .channel(`menu-votes-all-canteens`)
       .on('postgres_changes', {
         event: 'UPDATE',
         schema: 'public',
-        table: 'menu_items',
-        filter: `canteenid=eq.${selectedCanteen.id}`
+        table: 'menu_items'
       }, (payload) => {
         const { new: updatedItem, old: oldItem } = payload;
 
-        if (updatedItem.votes !== oldItem.votes)
-          setMenuItems(prevItems =>
-            prevItems.map(item =>
-              item.id === updatedItem.id ? { ...item, votes: updatedItem.votes } : item
-            )
-          );
+        // Only update the menu items if we're looking at the canteen that was updated
+        if (selectedCanteen && updatedItem.canteenid === selectedCanteen.id) {
+          if (updatedItem.votes !== oldItem.votes) {
+            setMenuItems(prevItems =>
+              prevItems.map(item =>
+                item.id === updatedItem.id ? { ...item, votes: updatedItem.votes } : item
+              )
+            );
+          }
+        }
 
+        // Show toast notifications for all canteens
         if (updatedItem.last_voter && updatedItem.last_voter !== userName) {
           const voteType = updatedItem.last_vote_type === 'liked' ? 'liked' : 'disliked';
-          const menuItem = menuItems.find(item => item.id === updatedItem.id);
 
-          if (menuItem) {
-            // Extract first name from last_voter
-            const firstName = updatedItem.last_voter.split(' ')[0];
-            toast(`${firstName} ${voteType} ${menuItem.name} at ${selectedCanteen.name}`, {
-              position: "bottom-right",
-              duration: 4000,
-            });
-          }
+          // Find which canteen this menu item belongs to
+          const canteenName = allCanteensMap[updatedItem.canteenid]?.name || 'Unknown Canteen';
+
+          // Extract first name from last_voter
+          const firstName = updatedItem.last_voter.split(' ')[0];
+
+          toast(`${firstName} ${voteType} ${updatedItem.name} at ${canteenName}`, {
+            position: "bottom-right",
+            duration: 4000,
+          });
         }
       });
 
@@ -284,13 +294,13 @@ export default function CanteenPage() {
     // Save the subscription
     setSupabaseSubscription(channel);
 
-    // Clean up subscription when component unmounts or canteen changes
+    // Clean up subscription when component unmounts
     return () => {
       if (channel) {
         supabase.removeChannel(channel);
       }
     };
-  }, [selectedCanteen, menuItems, userName]);
+  }, [selectedCanteen, userName, allCanteensMap]);
 
   const handleCanteenClick = (canteen: any) => {
     // Find the full canteen data from our canteens array using the id from the avatar click
