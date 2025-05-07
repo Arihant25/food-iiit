@@ -1,12 +1,14 @@
 "use client";
 
+import { Switch } from "@/components/ui/switch";
 import SwitchButton from "@/components/navigation/SwitchButton";
 import { supabase } from "@/lib/supabaseClient";
 import { useEffect, useState } from "react";
 import AvatarBanner from "@/components/navigation/AvatarBanner";
 import Marquee from "@/components/ui/marquee"
 import { isCanteenOpen } from "@/lib/utils";
-import { CheckIcon, ChevronsUpDown } from "lucide-react";
+import { useDebounce } from "@/lib/hooks"; // Import the debounce hook
+import { ArrowDownAZ, ArrowUpZA, CheckIcon, ChevronsUpDown, SortAsc, Leaf, Beef, ThumbsUp, ThumbsDown, Search, Utensils } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   Command,
@@ -21,6 +23,22 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { Input } from "@/components/ui/input";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardFooter,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
 
 interface Canteen {
   id: string;
@@ -34,6 +52,12 @@ interface Category {
   label: string;
 }
 
+interface SortOption {
+  value: string;
+  label: string;
+  icon: React.ReactNode;
+}
+
 export default function CanteenPage() {
   const [canteens, setCanteens] = useState<Canteen[]>([]);
   const [loading, setLoading] = useState(true);
@@ -42,7 +66,14 @@ export default function CanteenPage() {
   const [categories, setCategories] = useState<Category[]>([]);
   const [selectedCategories, setSelectedCategories] = useState<Category[]>([]);
   const [openCategoryDropdown, setOpenCategoryDropdown] = useState(false);
-  // Loading categories state removed
+  const [selectedSort, setSelectedSort] = useState<string>("none");
+  const [menuItems, setMenuItems] = useState<any[]>([]);
+  const [filteredMenuItems, setFilteredMenuItems] = useState<any[]>([]);
+  const [isVeg, setIsVeg] = useState(false);
+  const [isNonVeg, setIsNonVeg] = useState(false);
+  const [searchInputValue, setSearchInputValue] = useState("");
+  const searchQuery = useDebounce(searchInputValue, 300);
+  const [isVoting, setIsVoting] = useState(false);
 
   useEffect(() => {
     async function fetchCanteens() {
@@ -110,117 +141,408 @@ export default function CanteenPage() {
     fetchCategories();
   }, [selectedCanteen]);
 
+  useEffect(() => {
+    async function fetchMenuItems() {
+      if (!selectedCanteen) {
+        setMenuItems([]);
+        setFilteredMenuItems([]);
+        return;
+      }
+
+      try {
+        const { data, error } = await supabase
+          .from("menu_items")
+          .select("*")
+          .eq("canteenid", selectedCanteen.id);
+
+        if (error) {
+          throw error;
+        }
+
+        if (data) {
+          // The votes are now coming directly from the database
+          setMenuItems(data);
+          setFilteredMenuItems(data);
+        }
+      } catch (error: any) {
+        console.error("Error fetching menu items:", error);
+      }
+    }
+
+    fetchMenuItems();
+  }, [selectedCanteen]);
+
+  // Apply filtering and sorting whenever the filters change
+  useEffect(() => {
+    if (menuItems.length === 0) return;
+
+    let result = [...menuItems];
+
+    // Apply search filter
+    if (searchQuery) {
+      const query = searchQuery.toLowerCase();
+      result = result.filter(item =>
+        item.name.toLowerCase().includes(query) ||
+        (item.description && item.description.toLowerCase().includes(query))
+      );
+    }
+
+    // Apply category filter
+    if (selectedCategories.length > 0) {
+      result = result.filter(item =>
+        selectedCategories.some(cat => cat.value === item.category)
+      );
+    }
+
+    // Apply vegetarian filter
+    if (isVeg && !isNonVeg) {
+      result = result.filter(item => !item.is_nonveg);
+    }
+    // Apply non-vegetarian filter
+    else if (isNonVeg && !isVeg) {
+      result = result.filter(item => item.is_nonveg);
+    }
+    // If both are true or both are false, don't filter by vegetarian status
+
+    // Apply sorting
+    switch (selectedSort) {
+      case "a-z":
+        result.sort((a, b) => a.name.localeCompare(b.name));
+        break;
+      case "z-a":
+        result.sort((a, b) => b.name.localeCompare(a.name));
+        break;
+      case "price":
+        result.sort((a, b) => a.price - b.price);
+        break;
+      case "votes":
+        // Sort by votes directly from the database
+        result.sort((a, b) => (b.votes || 0) - (a.votes || 0));
+        break;
+    }
+
+    setFilteredMenuItems(result);
+  }, [menuItems, selectedCategories, selectedSort, isVeg, isNonVeg, searchQuery]);
+
   const handleCanteenClick = (canteen: any) => {
     // Find the full canteen data from our canteens array using the id from the avatar click
     const fullCanteenData = canteens.find(c => c.id === canteen.id);
 
     if (fullCanteenData) {
+      // Reset all filters when changing canteen
+      setSelectedCategories([]);
+      setSelectedSort("none");
+      setSearchInputValue(""); // Update this line to use setSearchInputValue instead of setSearchQuery
+      setIsVeg(false);
+      setIsNonVeg(false);
       setSelectedCanteen(fullCanteenData);
     } else {
       console.error("Canteen data not found for id:", canteen.id);
     }
   };
 
+  const handleVote = async (itemId: string, value: number) => {
+    if (isVoting) return; // Prevent multiple simultaneous votes
+
+    try {
+      setIsVoting(true);
+
+      // First get the current item to get its current votes
+      const { data: currentItem, error: fetchError } = await supabase
+        .from("menu_items")
+        .select("votes")
+        .eq("id", itemId)
+        .single();
+
+      if (fetchError) throw fetchError;
+
+      // Calculate new vote count (use 0 as default if votes is null)
+      const currentVotes = currentItem.votes || 0;
+      const newVotes = currentVotes + value;
+
+      // Update the votes in the database
+      const { error: updateError } = await supabase
+        .from("menu_items")
+        .update({ votes: newVotes })
+        .eq("id", itemId);
+
+      if (updateError) throw updateError;
+
+      // Update the local state to reflect the change
+      setMenuItems(menuItems.map(item =>
+        item.id === itemId ? { ...item, votes: newVotes } : item
+      ));
+
+      // Update filtered items as well
+      setFilteredMenuItems(filteredMenuItems.map(item =>
+        item.id === itemId ? { ...item, votes: newVotes } : item
+      ));
+
+    } catch (error: any) {
+      console.error("Error updating votes:", error);
+    } finally {
+      setIsVoting(false);
+    }
+  };
+
   return (
     <div className="relative p-6 flex flex-col min-h-screen">
       <div className="mx-9 mr-18">
-      </div>
 
-      <SwitchButton />
+        <SwitchButton />
 
-      <div className="flex-grow flex flex-col justify-center">
-        {!loading && canteens.length > 0 && (
-          <AvatarBanner
-            items={canteens.map(canteen => ({
-              id: canteen.id,
-              name: canteen.name,
-              image: canteen.avatar_url
-            }))}
-            onAvatarClick={handleCanteenClick}
-            selectedItemId={selectedCanteen?.id}
-          />
-        )}
+        <div className="flex-grow flex flex-col justify-center">
+          {!loading && canteens.length > 0 && (
+            <AvatarBanner
+              items={canteens.map(canteen => ({
+                id: canteen.id,
+                name: canteen.name,
+                image: canteen.avatar_url
+              }))}
+              onAvatarClick={handleCanteenClick}
+              selectedItemId={selectedCanteen?.id}
+            />
+          )}
 
-        {selectedCanteen && (
-          <div className="flex flex-col items-center mt-6 mb-12">
-            <div className="border-4 border-black shadow-shadow bg-main text-main-foreground p-6 max-w-md w-full rounded-lg transform rotate-1">
-              <h1 className="text-3xl font-heading text-center mb-4">{selectedCanteen.name}</h1>
+          {selectedCanteen && (
+            <div className="flex flex-col items-center mt-6 mb-12">
+              <div className="border-4 border-black shadow-shadow bg-main text-main-foreground p-6 max-w-md w-full rounded-lg transform rotate-1">
+                <h1 className="text-3xl font-heading text-center mb-4">{selectedCanteen.name}</h1>
 
-              {selectedCanteen.timings && (
-                <div className="flex flex-col items-center">
-                  <p className="text-lg font-base mb-2">Hours: {selectedCanteen.timings}</p>
-                  {isCanteenOpen(selectedCanteen.timings) ? (
-                    <p className="text-xl font-heading px-3 py-1 bg-secondary-background rounded-md border-2 border-black">OPEN NOW</p>
-                  ) : (
-                    <p className="text-xl font-heading px-3 py-1 bg-background rounded-md border-2 border-black">CLOSED</p>
-                  )}
+                {selectedCanteen.timings && (
+                  <div className="flex flex-col items-center">
+                    <p className="text-lg font-base mb-2">Hours: {selectedCanteen.timings}</p>
+                    {isCanteenOpen(selectedCanteen.timings) ? (
+                      <p className="text-xl font-heading px-3 py-1 bg-secondary-background rounded-md border-2 border-black">OPEN NOW</p>
+                    ) : (
+                      <p className="text-xl font-heading px-3 py-1 bg-background rounded-md border-2 border-black">CLOSED</p>
+                    )}
+                  </div>
+                )}
+              </div>
+
+              {/* Filters Section - Moved below canteen info card */}
+              <div className="flex flex-col mt-8 mb-4 max-w-4xl mx-auto w-full bg-secondary-background rounded-lg p-6 border-2 border-border">
+                <h2 className="text-xl font-heading mb-4 text-center">Filters & Search</h2>
+
+                {/* Search input - Updated to use searchInputValue state */}
+                <div className="mb-4">
+                  <div className="relative">
+                    <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-foreground/50 size-5" />
+                    <Input
+                      placeholder="Search menu items..."
+                      value={searchInputValue}
+                      onChange={(e) => setSearchInputValue(e.target.value)}
+                      className="pl-10"
+                    />
+                  </div>
                 </div>
-              )}
-            </div>
 
-            {/* Category Selection Dropdown */}
-            <div className="mt-6 max-w-md w-full">
-              <p className="text-lg font-semibold mb-2">Filter by category:</p>
-              <Popover open={openCategoryDropdown} onOpenChange={setOpenCategoryDropdown}>
-                <PopoverTrigger asChild>
-                  <Button
-                    variant="noShadow"
-                    role="combobox"
-                    aria-expanded={openCategoryDropdown}
-                    className="w-full justify-between bg-main text-main-foreground border-2 border-black"
-                  >
-                    {selectedCategories.length > 0
-                      ? selectedCategories.map((category) => category.label).join(", ")
-                      : "Select categories..."}
-                    <ChevronsUpDown className="text-muted-foreground" />
-                  </Button>
-                </PopoverTrigger>
-                <PopoverContent className="w-full p-0 border-0" align="start">
-                  <Command className="**:data-[slot=command-input-wrapper]:h-11">
-                    <CommandInput placeholder="Search categories..." />
-                    <CommandList>
-                      <CommandEmpty>No categories found.</CommandEmpty>
-                      <CommandGroup className="p-2 [&_[cmdk-group-items]]:flex [&_[cmdk-group-items]]:flex-col [&_[cmdk-group-items]]:gap-1">
-                        {categories.map((category) => (
-                          <CommandItem
-                            key={category.value}
-                            value={category.value}
-                            onSelect={(currentValue) => {
-                              setSelectedCategories(
-                                selectedCategories.some((c) => c.value === currentValue)
-                                  ? selectedCategories.filter(
-                                    (c) => c.value !== currentValue,
-                                  )
-                                  : [...selectedCategories, category],
-                              )
-                            }}
+                <div className="flex flex-wrap gap-4">
+                  {/* Category Selection Dropdown */}
+                  <div className="flex-1 min-w-[250px]">
+                    <p className="text-sm font-medium mb-1">Filter by category:</p>
+                    <Popover open={openCategoryDropdown} onOpenChange={setOpenCategoryDropdown}>
+                      <PopoverTrigger asChild>
+                        <Button
+                          variant="noShadow"
+                          role="combobox"
+                          aria-expanded={openCategoryDropdown}
+                          className="w-full justify-between bg-main text-main-foreground border-2 border-black"
+                        >
+                          {selectedCategories.length > 0
+                            ? selectedCategories.map((category) => category.label).join(", ")
+                            : "Select categories..."}
+                          <ChevronsUpDown className="text-muted-foreground" />
+                        </Button>
+                      </PopoverTrigger>
+                      <PopoverContent className="w-full p-0 border-0" align="start">
+                        <Command className="**:data-[slot=command-input-wrapper]:h-11">
+                          <CommandInput placeholder="Search categories..." />
+                          <CommandList>
+                            <CommandEmpty>No categories found.</CommandEmpty>
+                            <CommandGroup className="p-2 [&_[cmdk-group-items]]:flex [&_[cmdk-group-items]]:flex-col [&_[cmdk-group-items]]:gap-1">
+                              {categories.map((category) => (
+                                <CommandItem
+                                  key={category.value}
+                                  value={category.value}
+                                  onSelect={(currentValue) => {
+                                    setSelectedCategories(
+                                      selectedCategories.some((c) => c.value === currentValue)
+                                        ? selectedCategories.filter(
+                                          (c) => c.value !== currentValue,
+                                        )
+                                        : [...selectedCategories, category],
+                                    )
+                                  }}
+                                >
+                                  <div
+                                    className="border-border pointer-events-none size-5 shrink-0 rounded-base border-2 transition-all select-none *:[svg]:opacity-0 data-[selected=true]:*:[svg]:opacity-100"
+                                    data-selected={selectedCategories.some(
+                                      (c) => c.value === category.value,
+                                    )}
+                                  >
+                                    <CheckIcon className="size-4 text-current" />
+                                  </div>
+                                  {category.label}
+                                </CommandItem>
+                              ))}
+                            </CommandGroup>
+                          </CommandList>
+                        </Command>
+                      </PopoverContent>
+                    </Popover>
+                  </div>
+
+                  {/* Sort Dropdown - Now using Select component */}
+                  <div className="flex-1 min-w-[250px]">
+                    <p className="text-sm font-medium mb-1">Sort by:</p>
+                    <Select value={selectedSort} onValueChange={setSelectedSort}>
+                      <SelectTrigger className="w-full bg-main text-main-foreground border-2 border-black">
+                        <SelectValue placeholder="Sort options..." />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="none">No sorting</SelectItem>
+                        <SelectItem value="a-z">
+                          <div className="flex items-center gap-2">
+                            <ArrowDownAZ className="size-4" />
+                            <span>Sort A-Z</span>
+                          </div>
+                        </SelectItem>
+                        <SelectItem value="z-a">
+                          <div className="flex items-center gap-2">
+                            <ArrowUpZA className="size-4" />
+                            <span>Sort Z-A</span>
+                          </div>
+                        </SelectItem>
+                        <SelectItem value="price">
+                          <div className="flex items-center gap-2">
+                            <SortAsc className="size-4" />
+                            <span>Sort by Price</span>
+                          </div>
+                        </SelectItem>
+                        <SelectItem value="votes">
+                          <div className="flex items-center gap-2">
+                            <ThumbsUp className="size-4" />
+                            <span>Sort by Popularity</span>
+                          </div>
+                        </SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+
+                {/* Vegetarian/Non-vegetarian switches - Center aligned */}
+                <div className="mt-6 flex justify-center gap-8">
+                  <div className="flex items-center space-x-2">
+                    <Switch
+                      id="veg-mode"
+                      checked={isVeg}
+                      onCheckedChange={setIsVeg}
+                    />
+                    <label htmlFor="veg-mode" className="text-sm font-medium cursor-pointer flex items-center gap-1">
+                      <Leaf className="size-4 text-green-600" />
+                      <span>Vegetarian</span>
+                    </label>
+                  </div>
+
+                  <div className="flex items-center space-x-2">
+                    <Switch
+                      id="non-veg-mode"
+                      checked={isNonVeg}
+                      onCheckedChange={setIsNonVeg}
+                    />
+                    <label htmlFor="non-veg-mode" className="text-sm font-medium cursor-pointer flex items-center gap-1">
+                      <Beef className="size-4 text-red-600" />
+                      <span>Non-Vegetarian</span>
+                    </label>
+                  </div>
+                </div>
+              </div>
+
+              {/* Menu Items Display */}
+              <div className="mt-8 w-full max-w-4xl">
+                <h2 className="text-2xl font-heading mb-4">Menu Items</h2>
+                {filteredMenuItems.length > 0 ? (
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    {filteredMenuItems.map((item) => (
+                      <Card key={item.id} className="relative overflow-hidden hover:shadow-lg transition-all duration-300">
+                        <div className="absolute left-0 top-1/2 -translate-y-1/2 flex flex-col items-center p-1 bg-secondary-background border-r-2 border-y-2 border-border rounded-r-md">
+                          <Button
+                            variant="noShadow"
+                            size="icon"
+                            onClick={() => handleVote(item.id, 1)}
+                            className="h-8 w-8"
+                            disabled={isVoting}
                           >
-                            <div
-                              className="border-border pointer-events-none size-5 shrink-0 rounded-base border-2 transition-all select-none *:[svg]:opacity-0 data-[selected=true]:*:[svg]:opacity-100"
-                              data-selected={selectedCategories.some(
-                                (c) => c.value === category.value,
-                              )}
-                            >
-                              <CheckIcon className="size-4 text-current" />
-                            </div>
-                            {category.label}
-                          </CommandItem>
-                        ))}
-                      </CommandGroup>
-                    </CommandList>
-                  </Command>
-                </PopoverContent>
-              </Popover>
+                            <ThumbsUp className="size-4" />
+                          </Button>
+                          <span className="text-sm font-bold">{item.votes || 0}</span>
+                          <Button
+                            variant="noShadow"
+                            size="icon"
+                            onClick={() => handleVote(item.id, -1)}
+                            className="h-8 w-8"
+                            disabled={isVoting}
+                          >
+                            <ThumbsDown className="size-4" />
+                          </Button>
+                        </div>
+
+                        <div className="ml-10 flex">
+                          <div className="flex-1">
+                            <CardHeader>
+                              <div className="flex items-center justify-between">
+                                <CardTitle className="text-lg">
+                                  <div className="flex items-center gap-2">
+                                    {item.name}
+                                    {item.is_nonveg ?
+                                      <Beef className="size-4 text-red-600" /> :
+                                      <Leaf className="size-4 text-green-600" />
+                                    }
+                                  </div>
+                                </CardTitle>
+                                <div className="font-bold text-lg">₹{item.price.toFixed(2)}</div>
+                              </div>
+                              <CardDescription className="flex items-center gap-1">
+                                <Utensils className="size-3" />
+                                {item.category}
+                              </CardDescription>
+                            </CardHeader>
+
+                            {item.description && (
+                              <CardContent>
+                                <p className="text-sm">{item.description}</p>
+                              </CardContent>
+                            )}
+                          </div>
+
+                          <div className="w-24 h-24 flex items-center justify-center bg-secondary-background/50 rounded-md border border-border mx-4 my-auto overflow-hidden">
+                            {/* Placeholder for food image */}
+                            <div className="text-xs text-center text-foreground/60">Food Image</div>
+                          </div>
+                        </div>
+                      </Card>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="text-center p-8 border-2 border-dashed border-border rounded-base">
+                    <p>No menu items found with the selected filters.</p>
+                  </div>
+                )}
+              </div>
             </div>
-          </div>
-        )}
+          )}
+
+        </div>
 
         {!loading && !selectedCanteen && (
-          <div className="flex flex-col gap-8">
-            <Marquee items={canteens.map(canteen => canteen.name.toUpperCase())} />
-            <Marquee items={canteens.map(canteen => canteen.name.toUpperCase())} />
+          <div className="flex flex-col gap-8 justify-center items-center min-h-[50vh]">
+            <Marquee items={[...canteens].sort(() => 0.5 - Math.random()).map(canteen => canteen.name.toUpperCase())} />
+            <Marquee items={[...canteens].sort(() => 0.5 - Math.random()).map(canteen => canteen.name.toUpperCase())} />
+            <Marquee items={[...canteens].sort(() => 0.5 - Math.random()).map(canteen => canteen.name.toUpperCase())} />
 
-            <div className="flex justify-center items-center m-12">
+            <div className="flex justify-center items-center my-auto py-12">
               <div className="text-5xl font-bold p-6 border-4 border-black bg-chart-1 text-main-foreground transform rotate-1 text-center max-w-md relative overflow-hidden"
                 style={{
                   backgroundImage: `radial-gradient(circle, rgba(0, 0, 0, 0.2) 1px, transparent 1px)`,
@@ -233,8 +555,9 @@ export default function CanteenPage() {
               </div>
             </div>
 
-            <Marquee items={canteens.map(canteen => canteen.name.toUpperCase())} />
-            <Marquee items={canteens.map(canteen => canteen.name.toUpperCase())} />
+            <Marquee items={[...canteens].sort(() => 0.5 - Math.random()).map(canteen => canteen.name.toUpperCase())} />
+            <Marquee items={[...canteens].sort(() => 0.5 - Math.random()).map(canteen => canteen.name.toUpperCase())} />
+            <Marquee items={[...canteens].sort(() => 0.5 - Math.random()).map(canteen => canteen.name.toUpperCase())} />
           </div>
         )}
       </div>
