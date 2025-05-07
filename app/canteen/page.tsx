@@ -37,11 +37,14 @@ import { useRouter } from "next/navigation";
 import {
   Card,
   CardContent,
-  CardDescription,
-  CardFooter,
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import {
+  HoverCard,
+  HoverCardContent,
+  HoverCardTrigger,
+} from "@/components/ui/hover-card";
 
 interface Canteen {
   id: string;
@@ -200,8 +203,7 @@ export default function CanteenPage() {
     if (searchQuery) {
       const query = searchQuery.toLowerCase();
       result = result.filter(item =>
-        item.name.toLowerCase().includes(query) ||
-        (item.description && item.description.toLowerCase().includes(query))
+        item.name.toLowerCase().includes(query)
       );
     }
 
@@ -324,7 +326,6 @@ export default function CanteenPage() {
 
     if (!session?.user) {
       toast.error("You need to be logged in to vote");
-      const router = useRouter();
       router.push("/");
       return;
     }
@@ -587,56 +588,86 @@ export default function CanteenPage() {
                           {filteredMenuItems
                             .filter(item => item.category === category)
                             .map((item) => (
-                              <Card key={item.id} className="relative overflow-hidden hover:shadow-lg transition-all duration-300">
-                                <div className="absolute left-0 top-1/2 -translate-y-1/2 flex flex-col items-center p-1 rounded-r-md">
+                              <Card key={item.id} className="relative overflow-hidden transition-all duration-300 border-2 border-border">
+                                {/* Display rating indicator based on arihants_rating */}
+                                {item.arihants_rating !== null && (
+                                  <div className="absolute top-2 right-2 z-10">
+                                    <HoverCard>
+                                      <HoverCardTrigger>
+                                        <button
+                                          type="button"
+                                          className="cursor-help bg-transparent border-0 p-0 flex items-center justify-center"
+                                          aria-label="Arihant's Rating"
+                                        >
+                                          {item.arihants_rating === 2 && (
+                                            <ThumbsUp className="size-6 text-green-600 fill-green-600" />
+                                          )}
+                                          {item.arihants_rating === 1 && (
+                                            <ThumbsUp className="size-6 text-yellow-500 fill-yellow-500" />
+                                          )}
+                                          {item.arihants_rating === 0 && (
+                                            <ThumbsDown className="size-6 text-red-600 fill-red-600" />
+                                          )}
+                                        </button>
+                                      </HoverCardTrigger>
+                                      <HoverCardContent className="w-auto p-2 text-center">
+                                        <p className="text-sm font-medium">Arihant's Opinion</p>
+                                      </HoverCardContent>
+                                    </HoverCard>
+                                  </div>
+                                )}
+
+                                {/* Vote buttons on the left */}
+                                <div className="absolute top-1/2 -translate-y-1/2 flex flex-col items-center p-2 rounded-r-md">
                                   <Button
                                     variant="noShadow"
                                     size="icon"
                                     onClick={() => handleVote(item.id, 1)}
-                                    className="h-7 w-7 sm:h-8 sm:w-8"
+                                    className="h-8 w-8 sm:h-9 sm:w-9 mb-6 text-lg font-bold"
                                     disabled={isVoting}
                                   >
                                     ▲
                                   </Button>
-                                  <span className="text-md sm:text-lg font-bold">{item.votes || 0}</span>
                                   <Button
                                     variant="noShadow"
                                     size="icon"
                                     onClick={() => handleVote(item.id, -1)}
-                                    className="h-7 w-7 sm:h-8 sm:w-8"
+                                    className="h-8 w-8 sm:h-9 sm:w-9 text-lg font-bold"
                                     disabled={isVoting}
                                   >
                                     ▼
                                   </Button>
                                 </div>
 
-                                <div className="ml-10 flex">
-                                  <div className="flex-1">
-                                    <CardHeader className="p-3 sm:p-6">
-                                      <div className="flex items-center justify-between flex-wrap gap-2">
-                                        <CardTitle className="text-base sm:text-lg">
-                                          <div className="flex items-center gap-2">
-                                            {item.name}
-                                            {item.is_nonveg ?
-                                              <Drumstick className="size-4 text-red-600" /> :
-                                              <Leaf className="size-4 text-green-600" />
-                                            }
-                                          </div>
-                                        </CardTitle>
-                                        <div className="font-bold text-base sm:text-lg">₹{item.price.toFixed(2)}</div>
-                                      </div>
-                                    </CardHeader>
+                                {/* Vote count on the right */}
+                                <div className="absolute right-4 top-0 h-full flex items-center">
+                                  <span className="text-5xl font-bold">{item.votes || 0}</span>
+                                </div>
 
-                                    {item.description && (
-                                      <CardContent className="p-3 sm:p-6 pt-0">
-                                        <p className="text-xs sm:text-sm">{item.description}</p>
-                                      </CardContent>
-                                    )}
-                                  </div>
+                                {/* Main content */}
+                                <div className="ml-12 sm:ml-14 mr-12 sm:mr-14 flex flex-col">
+                                  <CardHeader className="p-1 sm:p-2">
+                                    <CardTitle className="text-xl sm:text-2xl font-bold">
+                                      {item.name}
+                                    </CardTitle>
+                                    <div className="text-base sm:text-xl font-semibold mt-1">₹{item.price.toFixed(2)}</div>
+                                  </CardHeader>
 
-                                  <div className="w-16 h-16 sm:w-24 sm:h-24 flex items-center justify-center bg-secondary-background/50 rounded-md border border-border mx-2 sm:mx-4 my-auto overflow-hidden">
-                                    {/* Placeholder for food image */}
-                                    <div className="text-xs text-center text-foreground/60">Food Image</div>
+                                  {/* Veg/Non-veg indicator with hover effect */}
+                                  <div className="absolute bottom-2 right-2 cursor-help">
+                                    <HoverCard>
+                                      <HoverCardTrigger>
+                                        {item.is_nonveg ?
+                                          <Drumstick className="size-5 sm:size-6 text-red-600" /> :
+                                          <Leaf className="size-5 sm:size-6 text-green-600" />
+                                        }
+                                      </HoverCardTrigger>
+                                      <HoverCardContent className="w-auto p-2 text-center">
+                                        <p className="text-sm font-medium">
+                                          {item.is_nonveg ? "Non-Vegetarian" : "Vegetarian"}
+                                        </p>
+                                      </HoverCardContent>
+                                    </HoverCard>
                                   </div>
                                 </div>
                               </Card>
