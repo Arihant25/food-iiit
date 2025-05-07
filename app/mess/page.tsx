@@ -1,6 +1,21 @@
+"use client";
+
 import SwitchButton from "@/components/navigation/SwitchButton";
+import { useSession } from "next-auth/react";
+import { useRouter } from "next/navigation";
+import { useEffect } from "react";
 
 export default function MessPage() {
+    const router = useRouter();
+    const { status } = useSession();
+
+    // Redirect to home if not logged in
+    useEffect(() => {
+        if (status === "unauthenticated") {
+            router.push("/");
+        }
+    }, [status, router]);
+
     return (
         <div className="relative p-6">
             <div className="mx-9 ml-18">
