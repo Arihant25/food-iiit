@@ -335,16 +335,30 @@ export default function CanteenPage() {
 
       // Use the adminOperation function to handle the vote
       const result = await adminOperation(async (client) => {
-        // First get the current item to get its current votes
+        // First get the current item to get its current votes and last voter info
         const { data: currentItem, error: fetchError } = await client
           .from("menu_items")
-          .select("votes, name")
+          .select("votes, name, last_voter, last_vote_type")
           .eq("id", itemId)
           .single();
 
         if (fetchError) {
           console.error("Error fetching current item:", fetchError);
           throw fetchError;
+        }
+
+        // Check if the current user is the same as the last voter and voting in the same direction
+        if (currentItem.last_voter === userName) {
+          const lastVoteType = currentItem.last_vote_type;
+          const currentVoteType = value > 0 ? 'liked' : 'disliked';
+
+          if (lastVoteType === currentVoteType) {
+            // User is trying to vote in the same direction again, don't register the vote
+            return {
+              skipVote: true,
+              currentItem
+            };
+          }
         }
 
         // Calculate new vote count (use 0 as default if votes is null)
@@ -370,6 +384,15 @@ export default function CanteenPage() {
 
         return { currentItem, newVotes, updateData };
       });
+
+      // Check if we should skip the vote update
+      if (result && result.skipVote) {
+        toast.warning("Calm down, my guy", {
+          position: "bottom-right",
+          duration: 3000,
+        });
+        return;
+      }
 
       // Update the local state to reflect the change
       if (result) {

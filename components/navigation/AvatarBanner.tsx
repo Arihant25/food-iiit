@@ -36,12 +36,12 @@ export default function AvatarBanner({ items, className, onAvatarClick, selected
                         return (
                             <div
                                 key={item.id}
-                                className="flex flex-col items-center mx-3"
+                                className="flex flex-col items-center mx-3 "
                                 onClick={() => handleAvatarClick(item)}
                             >
                                 <Avatar
                                     className={cn(
-                                        "my-1 cursor-pointer transition-all border-1 border-border shadow-shadow ",
+                                        "my-1 cursor-pointer transition-all border-1 border-border shadow-shadow w-13 h-13",
                                         isSelected && "border-primary shadow-shadow-lg translate-x-boxShadowX translate-y-boxShadowY"
                                     )}
                                 >
