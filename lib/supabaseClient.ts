@@ -23,7 +23,7 @@ export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
 // For direct database operations with admin-like access
 // This is used for operations that need to bypass RLS
 // (only to be used where security is still maintained by the application logic)
-export async function adminOperation(operation: (client: typeof supabase) => Promise<any>) {
+export async function adminOperation<T>(operation: (client: typeof supabase) => Promise<T>): Promise<T> {
     try {
         // Since we're calling this from client components and want to maintain votes
         // without complex auth setup, we'll use the anon key but ensure our application
@@ -60,7 +60,8 @@ export async function getAuthenticatedSupabaseClient() {
             .from('users')
             .insert({
                 email: session.user.email,
-                name: session.user.name
+                name: session.user.name,
+                roll_number: session.user.rollNumber
             })
 
         if (insertError) {

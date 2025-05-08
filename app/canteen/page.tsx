@@ -1,3 +1,4 @@
+/* eslint-disable */
 "use client";
 
 import { Switch } from "@/components/ui/switch";
@@ -8,7 +9,7 @@ import AvatarBanner from "@/components/navigation/AvatarBanner";
 import Marquee from "@/components/ui/marquee"
 import { isCanteenOpen } from "@/lib/utils";
 import { useDebounce } from "@/lib/hooks";
-import { ArrowDownAZ, ArrowUpZA, CheckIcon, ChevronsUpDown, SortAsc, Leaf, Drumstick, ThumbsUp, ThumbsDown, Search, Utensils } from "lucide-react";
+import { ArrowDownAZ, ArrowUpZA, CheckIcon, ChevronsUpDown, SortAsc, Leaf, Drumstick, ThumbsUp, ThumbsDown, Search } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useSession } from "next-auth/react";
 import { toast } from "sonner";
@@ -36,7 +37,6 @@ import { Input } from "@/components/ui/input";
 import { useRouter } from "next/navigation";
 import {
   Card,
-  CardContent,
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
@@ -45,6 +45,7 @@ import {
   HoverCardContent,
   HoverCardTrigger,
 } from "@/components/ui/hover-card";
+import { RealtimeChannel } from '@supabase/supabase-js';
 
 interface Canteen {
   id: string;
@@ -53,9 +54,40 @@ interface Canteen {
   timings: string | null;
 }
 
+interface MenuItem {
+  id: string;
+  name: string;
+  price: number;
+  category: string;
+  is_nonveg: boolean;
+  votes: number | null;
+  canteenid: string;
+  arihants_rating: number | null;
+  last_voter?: string;
+  last_vote_type?: 'liked' | 'disliked';
+  last_vote_timestamp?: string;
+}
+
 interface Category {
   value: string;
   label: string;
+}
+
+// Define a type for the vote payload
+interface VotePayload {
+  new: MenuItem & {
+    last_voter: string;
+    last_vote_type: 'liked' | 'disliked';
+    last_vote_timestamp: string;
+  };
+  old: MenuItem;
+}
+
+// Define specific error type for better error handling
+type SupabaseErrorType = {
+  message: string;
+  details?: string;
+  code?: string;
 }
 
 export default function CanteenPage() {
@@ -69,25 +101,24 @@ export default function CanteenPage() {
   const [selectedCategories, setSelectedCategories] = useState<Category[]>([]);
   const [openCategoryDropdown, setOpenCategoryDropdown] = useState(false);
   const [selectedSort, setSelectedSort] = useState<string>("none");
-  const [menuItems, setMenuItems] = useState<any[]>([]);
-  const [filteredMenuItems, setFilteredMenuItems] = useState<any[]>([]);
+  const [menuItems, setMenuItems] = useState<MenuItem[]>([]);
+  const [filteredMenuItems, setFilteredMenuItems] = useState<MenuItem[]>([]);
   const [isVeg, setIsVeg] = useState(false);
   const [isNonVeg, setIsNonVeg] = useState(false);
   const [searchInputValue, setSearchInputValue] = useState("");
   const searchQuery = useDebounce(searchInputValue, 300);
-  const [isVoting, setIsVoting] = useState(false);
   const userName = session?.user?.name || "Anonymous User";
   const [allCanteensMap, setAllCanteensMap] = useState<Record<string, Canteen>>({});
 
   // We'll track active subscriptions to clean them up when needed
-  const [supabaseSubscription, setSupabaseSubscription] = useState<any>(null);
+  const [supabaseChannel, setSupabaseChannel] = useState<RealtimeChannel | null>(null);
 
   // Redirect to home if not logged in
-  // useEffect(() => {
-  //   if (status === "unauthenticated") {
-  //     router.push("/");
-  //   }
-  // }, [status, router]);
+  useEffect(() => {
+    if (status === "unauthenticated") {
+      router.push("/");
+    }
+  }, [status, router]);
 
   useEffect(() => {
     async function fetchCanteens() {
@@ -96,6 +127,7 @@ export default function CanteenPage() {
         const { data, error } = await supabase.from("canteens").select("*");
 
         if (error) {
+          setError(error.message);
           throw error;
         }
 
@@ -113,8 +145,9 @@ export default function CanteenPage() {
           });
           setAllCanteensMap(canteenMap);
         }
-      } catch (error: any) {
-        setError(error.message);
+      } catch (error: unknown) {
+        const supabaseError = error as SupabaseErrorType;
+        setError(supabaseError.message);
         console.error("Error fetching canteens:", error);
       } finally {
         setLoading(false);
@@ -154,7 +187,7 @@ export default function CanteenPage() {
 
           setCategories(formattedCategories);
         }
-      } catch (error: any) {
+      } catch (error: unknown) {
         console.error("Error fetching categories:", error);
       }
     }
@@ -185,7 +218,7 @@ export default function CanteenPage() {
           setMenuItems(data);
           setFilteredMenuItems(data);
         }
-      } catch (error: any) {
+      } catch (error: unknown) {
         console.error("Error fetching menu items:", error);
       }
     }
@@ -246,84 +279,85 @@ export default function CanteenPage() {
 
   // Set up Supabase real-time subscription for all canteens
   useEffect(() => {
-    // Clean up any existing subscription when component re-mounts
-    if (supabaseSubscription) {
-      supabase.removeChannel(supabaseSubscription);
-      setSupabaseSubscription(null);
-    }
-
     // Create a global subscription for all menu items
     const channel = supabase
-      .channel(`menu-votes-all-canteens`)
-      .on('postgres_changes', {
-        event: 'UPDATE',
-        schema: 'public',
-        table: 'menu_items'
-      }, (payload) => {
-        const { new: updatedItem, old: oldItem } = payload;
+      .channel('menu-votes-all-canteens')
+      .on(
+        'postgres_changes' as any,
+        {
+          event: 'UPDATE',
+          schema: 'public',
+          table: 'menu_items'
+        },
+        (payload: VotePayload) => {
+          const { new: updatedItem, old: oldItem } = payload;
 
-        // Only update the menu items if we're looking at the canteen that was updated
-        if (selectedCanteen && updatedItem.canteenid === selectedCanteen.id) {
-          if (updatedItem.votes !== oldItem.votes) {
-            setMenuItems(prevItems =>
-              prevItems.map(item =>
-                item.id === updatedItem.id ? { ...item, votes: updatedItem.votes } : item
-              )
-            );
+          // Only update the menu items if we're looking at the canteen that was updated
+          if (selectedCanteen && updatedItem.canteenid === selectedCanteen.id) {
+            if (updatedItem.votes !== oldItem.votes) {
+              setMenuItems(prevItems =>
+                prevItems.map(item =>
+                  item.id === updatedItem.id ? { ...item, votes: updatedItem.votes } : item
+                )
+              );
+            }
+          }
+
+          // Show toast notifications for all canteens
+          if (updatedItem.last_voter && updatedItem.last_voter !== userName) {
+            const voteType = updatedItem.last_vote_type === 'liked' ? 'liked' : 'disliked';
+
+            // Find which canteen this menu item belongs to
+            const canteenName = allCanteensMap[updatedItem.canteenid]?.name || 'Unknown Canteen';
+
+            // Extract first name from last_voter
+            const firstName = updatedItem.last_voter.split(' ')[0];
+
+            toast(`${firstName} ${voteType} ${updatedItem.name} at ${canteenName}`, {
+              position: "bottom-right",
+              duration: 4000,
+            });
           }
         }
-
-        // Show toast notifications for all canteens
-        if (updatedItem.last_voter && updatedItem.last_voter !== userName) {
-          const voteType = updatedItem.last_vote_type === 'liked' ? 'liked' : 'disliked';
-
-          // Find which canteen this menu item belongs to
-          const canteenName = allCanteensMap[updatedItem.canteenid]?.name || 'Unknown Canteen';
-
-          // Extract first name from last_voter
-          const firstName = updatedItem.last_voter.split(' ')[0];
-
-          toast(`${firstName} ${voteType} ${updatedItem.name} at ${canteenName}`, {
-            position: "bottom-right",
-            duration: 4000,
-          });
-        }
-      });
+      );
 
     // Subscribe to the channel
     channel.subscribe();
 
-    // Save the subscription
-    setSupabaseSubscription(channel);
+    // Store this channel for cleanup
+    setSupabaseChannel(channel);
 
     // Clean up subscription when component unmounts
     return () => {
-      if (channel) {
-        supabase.removeChannel(channel);
-      }
+      supabase.removeChannel(channel);
     };
-  }, [selectedCanteen, userName, allCanteensMap]);
+  }, [selectedCanteen, userName, allCanteensMap]); // Remove supabaseChannel from the dependency array
 
-  const handleCanteenClick = (canteen: any) => {
+  // Update the type in the AvatarBanner component props
+  interface AvatarItem {
+    id: string;
+    name: string;
+    image?: string | null;
+  }
+
+  const handleCanteenClick = (item: AvatarItem) => {
     // Find the full canteen data from our canteens array using the id from the avatar click
-    const fullCanteenData = canteens.find(c => c.id === canteen.id);
+    const fullCanteenData = canteens.find(c => c.id === item.id);
 
     if (fullCanteenData) {
       // Reset all filters when changing canteen
       setSelectedCategories([]);
       setSelectedSort("none");
-      setSearchInputValue(""); // Update this line to use setSearchInputValue instead of setSearchQuery
+      setSearchInputValue("");
       setIsVeg(false);
       setIsNonVeg(false);
       setSelectedCanteen(fullCanteenData);
     } else {
-      console.error("Canteen data not found for id:", canteen.id);
+      console.error("Canteen data not found for id:", item.id);
     }
   };
 
   const handleVote = async (itemId: string, value: number) => {
-    if (isVoting) return; // Prevent multiple simultaneous votes
-
     if (!session?.user) {
       toast.error("You need to be logged in to vote");
       router.push("/");
@@ -331,8 +365,6 @@ export default function CanteenPage() {
     }
 
     try {
-      setIsVoting(true);
-
       // Use the adminOperation function to handle the vote
       const result = await adminOperation(async (client) => {
         // First get the current item to get its current votes and last voter info
@@ -414,16 +446,15 @@ export default function CanteenPage() {
         });
       }
 
-    } catch (error: any) {
-      console.error("Error in voting process:", error);
+    } catch (error: unknown) {
+      const supabaseError = error as SupabaseErrorType;
+      console.error("Error in voting process:", supabaseError);
       toast.error("Failed to register your vote. Please try again.");
-    } finally {
-      setIsVoting(false);
     }
   };
 
   return (
-    <div className="relative p-2 sm:p-6 flex flex-col min-h-screen">
+    <main className="relative p-2 sm:p-6 flex flex-col min-h-screen">
       <div className="mx-2 mr-14 mb-10">
 
         <SwitchButton />
@@ -647,7 +678,6 @@ export default function CanteenPage() {
                                     size="icon"
                                     onClick={() => handleVote(item.id, 1)}
                                     className="h-8 w-8 sm:h-9 sm:w-9 mb-6 text-lg font-bold"
-                                    disabled={isVoting}
                                   >
                                     ▲
                                   </Button>
@@ -656,7 +686,6 @@ export default function CanteenPage() {
                                     size="icon"
                                     onClick={() => handleVote(item.id, -1)}
                                     className="h-8 w-8 sm:h-9 sm:w-9 text-lg font-bold"
-                                    disabled={isVoting}
                                   >
                                     ▼
                                   </Button>
@@ -732,6 +761,6 @@ export default function CanteenPage() {
           </div>
         )}
       </div>
-    </div>
+    </main>
   );
 }

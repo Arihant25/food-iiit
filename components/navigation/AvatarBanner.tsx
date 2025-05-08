@@ -19,7 +19,9 @@ interface AvatarBannerProps {
 
 export default function AvatarBanner({ items, className, onAvatarClick, selectedItemId }: AvatarBannerProps) {
     const handleAvatarClick = (item: AvatarItem) => {
-        onAvatarClick && onAvatarClick(item);
+        if (onAvatarClick) {
+            onAvatarClick(item);
+        }
     };
 
     return (

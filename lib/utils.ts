@@ -20,7 +20,6 @@ export function isCanteenOpen(timings: string): boolean {
   // Parse the hours into date objects for today
   const now = new Date();
   const currentHour = now.getHours();
-  const currentMinutes = now.getMinutes();
 
   // Convert 12-hour format to 24-hour numbers
   function parseTime(timeStr: string): number {
