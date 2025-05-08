@@ -13,6 +13,7 @@ import { MessIcon } from "@/components/ui/mess-icon"
 import { Card } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 
 interface Listing {
     id: string
@@ -24,7 +25,10 @@ interface Listing {
     seller_id: string
     created_at: string
     seller_name?: string
+    buyer_name?: string
     bids?: bid[]
+    status?: string
+    transaction?: boolean
 }
 
 interface bid {
@@ -35,6 +39,8 @@ interface bid {
     created_at: string
     accepted: boolean
     buyer_name?: string
+    seller_name?: string
+    listing?: any
 }
 
 interface Transaction {
@@ -57,7 +63,7 @@ export default function DashboardPage() {
     const { data: session, status } = useSession()
     const [soldListings, setSoldListings] = useState<Listing[]>([])
     const [purchasedListings, setPurchasedListings] = useState<Listing[]>([])
-    const [myBids, setMyBids] = useState<Bid[]>([])
+    const [myBids, setMyBids] = useState<bid[]>([])
     const [transactions, setTransactions] = useState<Transaction[]>([])
     const [loading, setLoading] = useState(true)
     const [activeTab, setActiveTab] = useState("sold")
@@ -597,71 +603,71 @@ export default function DashboardPage() {
                         </div>
                     ) : transactions.length > 0 ? (
                         <div className="overflow-x-auto rounded-md border">
-                            <table className="min-w-full divide-y divide-border">
-                                <thead className="bg-muted/50">
-                                    <tr>
-                                        <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
+                            <Table>
+                                <TableHeader className="bg-muted/50">
+                                    <TableRow>
+                                        <TableHead className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
                                             Date
-                                        </th>
-                                        <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
+                                        </TableHead>
+                                        <TableHead className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
                                             Meal
-                                        </th>
-                                        <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
+                                        </TableHead>
+                                        <TableHead className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
                                             Mess
-                                        </th>
-                                        <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
+                                        </TableHead>
+                                        <TableHead className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
                                             Listed Price
-                                        </th>
-                                        <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
+                                        </TableHead>
+                                        <TableHead className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
                                             Sold Price
-                                        </th>
-                                        <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
+                                        </TableHead>
+                                        <TableHead className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
                                             Role
-                                        </th>
-                                        <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
+                                        </TableHead>
+                                        <TableHead className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
                                             Other Party
-                                        </th>
-                                        <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
+                                        </TableHead>
+                                        <TableHead className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
                                             Time to Sale
-                                        </th>
-                                    </tr>
-                                </thead>
-                                <tbody className="bg-card divide-y divide-border">
+                                        </TableHead>
+                                    </TableRow>
+                                </TableHeader>
+                                <TableBody className="bg-card divide-y divide-border">
                                     {transactions.map((tx) => {
                                         const isUserBuyer = tx.buyer_id === session?.user?.rollNumber;
                                         return (
-                                            <tr key={tx.id}>
-                                                <td className="px-6 py-4 whitespace-nowrap text-sm">
+                                            <TableRow key={tx.id}>
+                                                <TableCell className="whitespace-nowrap text-sm">
                                                     {formatDate(tx.date_of_transaction)}
-                                                </td>
-                                                <td className="px-6 py-4 whitespace-nowrap text-sm">
+                                                </TableCell>
+                                                <TableCell className="whitespace-nowrap text-sm">
                                                     {tx.meal}
-                                                </td>
-                                                <td className="px-6 py-4 whitespace-nowrap text-sm">
+                                                </TableCell>
+                                                <TableCell className="whitespace-nowrap text-sm">
                                                     {tx.mess}
-                                                </td>
-                                                <td className="px-6 py-4 whitespace-nowrap text-sm">
+                                                </TableCell>
+                                                <TableCell className="whitespace-nowrap text-sm">
                                                     {formatPrice(tx.listing_price)}
-                                                </td>
-                                                <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                                                </TableCell>
+                                                <TableCell className="whitespace-nowrap text-sm font-medium">
                                                     {formatPrice(tx.sold_price)}
-                                                </td>
-                                                <td className="px-6 py-4 whitespace-nowrap text-sm">
+                                                </TableCell>
+                                                <TableCell className="whitespace-nowrap text-sm">
                                                     <span className={`px-2 py-1 rounded-full text-xs font-semibold ${isUserBuyer ? "bg-blue-100 text-blue-800" : "bg-emerald-100 text-emerald-800"}`}>
                                                         {isUserBuyer ? "Buyer" : "Seller"}
                                                     </span>
-                                                </td>
-                                                <td className="px-6 py-4 whitespace-nowrap text-sm">
+                                                </TableCell>
+                                                <TableCell className="whitespace-nowrap text-sm">
                                                     {isUserBuyer ? tx.seller_name : tx.buyer_name}
-                                                </td>
-                                                <td className="px-6 py-4 whitespace-nowrap text-sm text-muted-foreground">
+                                                </TableCell>
+                                                <TableCell className="whitespace-nowrap text-sm text-muted-foreground">
                                                     {tx.time_gap}
-                                                </td>
-                                            </tr>
+                                                </TableCell>
+                                            </TableRow>
                                         );
                                     })}
-                                </tbody>
-                            </table>
+                                </TableBody>
+                            </Table>
                         </div>
                     ) : (
                         <div className="flex flex-col items-center justify-center h-64 text-center">

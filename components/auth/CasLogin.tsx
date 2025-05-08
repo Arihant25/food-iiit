@@ -28,7 +28,7 @@ export default function CasLogin() {
                 ticket,
                 service, // Pass the service URL to match what was sent to CAS
                 redirect: true,
-                callbackUrl: "/canteen", // TODO: Change to /mess
+                callbackUrl: "/mess",
             }).catch((err) => {
                 console.error("Authentication error:", err);
                 setError("Authentication failed. Please try again.");

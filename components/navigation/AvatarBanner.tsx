@@ -19,6 +19,11 @@ interface AvatarBannerProps {
 }
 export default function AvatarBanner({ items, className, onAvatarClick, selectedItemId, isCanteen = false }: AvatarBannerProps) {
     const handleAvatarClick = (item: AvatarItem) => {
+        // Add haptic feedback if vibration is supported by the browser
+        if (typeof navigator !== 'undefined' && 'vibrate' in navigator) {
+            navigator.vibrate(50); // Vibrate for 50ms for a short click sensation
+        }
+
         if (onAvatarClick) {
             onAvatarClick(item);
         }
