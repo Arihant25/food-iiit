@@ -38,6 +38,7 @@ interface bid {
     bid_price: number
     created_at: string
     accepted: boolean
+    paid: boolean
     buyer_name?: string
     seller_name?: string
     listing?: any
@@ -543,8 +544,8 @@ export default function DashboardPage() {
                                     <div className="p-4 relative">
                                         <div className="absolute top-4 right-4">
                                             <span className={`px-2 py-1 rounded-full text-xs font-semibold 
-                                                ${bid.accepted ? "bg-emerald-100 text-emerald-800" : "bg-blue-100 text-blue-800"}`}>
-                                                {bid.accepted ? "Accepted" : "Pending"}
+                                                ${bid.paid ? "bg-amber-100 text-amber-800" : bid.accepted ? "bg-emerald-100 text-emerald-800" : "bg-blue-100 text-blue-800"}`}>
+                                                {bid.paid ? "Paid" : bid.accepted ? "Accepted" : "Pending"}
                                             </span>
                                         </div>
 
@@ -582,6 +583,22 @@ export default function DashboardPage() {
                                                 Seller: {bid.seller_name}
                                             </p>
                                         </div>
+
+                                        {bid.accepted && !bid.paid && (
+                                            <div className="mt-3 p-2 bg-emerald-50 border border-emerald-200 rounded-md text-sm">
+                                                <p className="text-emerald-800">
+                                                    <span className="font-semibold">Your bid was accepted!</span> Please contact the seller to arrange payment.
+                                                </p>
+                                            </div>
+                                        )}
+
+                                        {bid.paid && (
+                                            <div className="mt-3 p-2 bg-amber-50 border border-amber-200 rounded-md text-sm">
+                                                <p className="text-amber-800">
+                                                    <span className="font-semibold">Payment confirmed!</span> The transaction is complete.
+                                                </p>
+                                            </div>
+                                        )}
                                     </div>
                                 </Card>
                             ))}

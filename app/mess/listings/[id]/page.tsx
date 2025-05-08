@@ -38,6 +38,7 @@ interface Bid {
     bid_price: number
     created_at: string
     accepted: boolean
+    paid: boolean
     buyer?: {
         name: string
         email: string
@@ -204,6 +205,29 @@ export default function ListingDetailPage() {
                     .eq("listing_id", id)
 
                 if (error) throw error
+
+                // Send notification to the seller about the updated bid
+                if (typeof window !== 'undefined') {
+                    // Import dynamically to avoid server-side issues
+                    const { sendNotification, notificationMessages } = await import('@/lib/notifications')
+
+                    const notif = notificationMessages.bidUpdated(bidValue, listing.mess, listing.meal)
+
+                    await sendNotification(
+                        listing.seller_id,
+                        'bid_updated',
+                        notif.title,
+                        notif.message,
+                        {
+                            listingId: id,
+                            buyerId: session.user.rollNumber,
+                            price: bidValue,
+                            mess: listing.mess,
+                            meal: listing.meal
+                        }
+                    )
+                }
+
                 toast.success(`Your bid has been updated to ₹${bidValue}`)
             } else {
                 // Create new bid
@@ -216,6 +240,29 @@ export default function ListingDetailPage() {
                     })
 
                 if (error) throw error
+
+                // Send notification to the seller about the new bid
+                if (typeof window !== 'undefined') {
+                    // Import dynamically to avoid server-side issues
+                    const { sendNotification, notificationMessages } = await import('@/lib/notifications')
+
+                    const notif = notificationMessages.bidPlaced(bidValue, listing.mess, listing.meal)
+
+                    await sendNotification(
+                        listing.seller_id,
+                        'bid_placed',
+                        notif.title,
+                        notif.message,
+                        {
+                            listingId: id,
+                            buyerId: session.user.rollNumber,
+                            price: bidValue,
+                            mess: listing.mess,
+                            meal: listing.meal
+                        }
+                    )
+                }
+
                 toast.success(`Your bid of ₹${bidValue} has been placed`)
             }
 
@@ -251,7 +298,64 @@ export default function ListingDetailPage() {
 
             if (bidError) throw bidError
 
-            // Create transaction history entry immediately
+            // Send notification to the buyer
+            if (typeof window !== 'undefined') {
+                // Import dynamically to avoid server-side issues
+                const { sendNotification, notificationMessages } = await import('@/lib/notifications')
+
+                const notif = notificationMessages.bidAccepted(bidPrice, listing.mess, listing.meal)
+
+                await sendNotification(
+                    buyerRollNumber,
+                    'bid_accepted',
+                    notif.title,
+                    notif.message,
+                    {
+                        listingId: id,
+                        bidId: bidId,
+                        sellerId: listing.seller_id,
+                        buyerId: buyerRollNumber,
+                        price: bidPrice,
+                        mess: listing.mess,
+                        meal: listing.meal
+                    }
+                )
+            }
+
+            toast.success("Bid accepted successfully")
+            fetchBids() // Refresh the bids list
+        } catch (error) {
+            console.error("Error accepting bid:", error)
+            toast.error("Failed to accept bid")
+        } finally {
+            setCompletingTransaction(false)
+        }
+    }
+
+    // Mark a bid as paid (seller only)
+    const markBidAsPaid = async (bidId: string, bidPrice: number, buyerRollNumber: string) => {
+        if (!session?.user || session.user.rollNumber !== listing?.seller_id) {
+            toast.error("Only the seller can mark a bid as paid")
+            return
+        }
+
+        if (!listing) {
+            toast.error("Listing information is missing")
+            return
+        }
+
+        try {
+            setCompletingTransaction(true)
+
+            // Mark the bid as paid
+            const { error: bidError } = await supabase
+                .from("bids")
+                .update({ paid: true })
+                .eq("id", bidId)
+
+            if (bidError) throw bidError
+
+            // Create transaction history entry
             const { error: txError } = await supabase
                 .from("transaction_history")
                 .insert({
@@ -267,6 +371,47 @@ export default function ListingDetailPage() {
                 })
 
             if (txError) throw txError
+
+            // Send notification to the buyer
+            if (typeof window !== 'undefined') {
+                // Import dynamically to avoid server-side issues
+                const { sendNotification, notificationMessages } = await import('@/lib/notifications')
+
+                const buyerNotif = notificationMessages.paymentMarked(bidPrice, listing.mess, listing.meal)
+                await sendNotification(
+                    buyerRollNumber,
+                    'payment_marked',
+                    buyerNotif.title,
+                    buyerNotif.message,
+                    {
+                        listingId: id,
+                        bidId: bidId,
+                        sellerId: listing.seller_id,
+                        buyerId: buyerRollNumber,
+                        price: bidPrice,
+                        mess: listing.mess,
+                        meal: listing.meal
+                    }
+                )
+
+                // Also notify the seller (self-notification for record keeping)
+                const sellerNotif = notificationMessages.paymentReceived(bidPrice, listing.mess, listing.meal)
+                await sendNotification(
+                    listing.seller_id,
+                    'payment_marked',
+                    sellerNotif.title,
+                    sellerNotif.message,
+                    {
+                        listingId: id,
+                        bidId: bidId,
+                        sellerId: listing.seller_id,
+                        buyerId: buyerRollNumber,
+                        price: bidPrice,
+                        mess: listing.mess,
+                        meal: listing.meal
+                    }
+                )
+            }
 
             // Delete all bids for this listing
             const { error: deleteBidsError } = await supabase
@@ -284,12 +429,14 @@ export default function ListingDetailPage() {
 
             if (deleteListingError) throw deleteListingError
 
-            toast.success("Bid accepted and transaction completed successfully")
+            toast.success("Payment confirmed and transaction completed successfully")
             // Redirect to dashboard since this listing is now deleted
             router.push("/mess/dashboard")
         } catch (error) {
-            console.error("Error accepting bid:", error)
-            toast.error("Failed to accept bid")
+            console.error("Error marking bid as paid:", error)
+            toast.error("Failed to mark bid as paid")
+        } finally {
+            setCompletingTransaction(false)
         }
     }
 
@@ -452,12 +599,25 @@ export default function ListingDetailPage() {
                                             Bid placed on {new Date(bid.created_at).toLocaleDateString()} at {new Date(bid.created_at).toLocaleTimeString()}
                                         </p>
                                     </div>
-                                    <Button
-                                        onClick={() => acceptBid(bid.id, bid.bid_price, bid.buyer_roll_number)}
-                                        disabled={bid.accepted}
-                                    >
-                                        {bid.accepted ? "Accepted" : "Accept Bid"}
-                                    </Button>
+                                    <div className="flex gap-2">
+                                        {bid.accepted ? (
+                                            <Button
+                                                onClick={() => markBidAsPaid(bid.id, bid.bid_price, bid.buyer_roll_number)}
+                                                variant="noShadow"
+                                                className="bg-emerald-100 border-emerald-800 text-emerald-800"
+                                                disabled={bid.paid || completingTransaction}
+                                            >
+                                                {bid.paid ? "Paid" : "Mark as Paid"}
+                                            </Button>
+                                        ) : (
+                                            <Button
+                                                onClick={() => acceptBid(bid.id, bid.bid_price, bid.buyer_roll_number)}
+                                                disabled={completingTransaction}
+                                            >
+                                                Accept Bid
+                                            </Button>
+                                        )}
+                                    </div>
                                 </div>
                             ))}
                         </CardContent>

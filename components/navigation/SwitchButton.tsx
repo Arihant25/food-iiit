@@ -16,17 +16,17 @@ export default function SwitchButton() {
     useEffect(() => {
         setMounted(true);
     }, []);
-    
+
     const [isExiting, setIsExiting] = useState(false);
 
     if (!mounted) return null;
 
     const handleSwitchClick = (e: React.MouseEvent<HTMLButtonElement>) => {
         e.preventDefault();
-        
+
         // Set exiting state to trigger exit animation
         setIsExiting(true);
-        
+
         // Define the target URL
         const targetUrl = isCanteenPage ? "/mess" : "/canteen";
 
@@ -55,7 +55,7 @@ export default function SwitchButton() {
             >
                 <Button
                     variant="default"
-                    className="h-full w-12 p-0 rounded-none cursor-pointer"
+                    className="h-[calc(100%-76px)] w-12 p-0 rounded-none cursor-pointer"
                     onClick={handleSwitchClick}
                 >
                     <div className="h-full w-full flex items-center justify-center">
