@@ -33,6 +33,11 @@ export default function MessLayout({
             image: "https://cdn-icons-png.flaticon.com/512/4394/4394562.png"
         },
         {
+            id: "dashboard",
+            name: "Dashboard",
+            image: "https://cdn-icons-png.flaticon.com/512/8899/8899687.png"
+        },
+        {
             id: "analysis",
             name: "Analysis",
             image: "https://cdn-icons-png.flaticon.com/512/1011/1011528.png"
@@ -55,8 +60,8 @@ export default function MessLayout({
     };
 
     return (
-        <div className="relative p-6">
-            <div className="mx-9 ml-18">
+        <div className="relative p-6 ">
+            <div className="mx-9 ml-18 mb-20">
                 {children}
 
                 <SwitchButton />

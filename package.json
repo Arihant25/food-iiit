@@ -19,6 +19,7 @@
     "@radix-ui/react-select": "^2.2.4",
     "@radix-ui/react-slot": "^1.2.2",
     "@radix-ui/react-switch": "^1.2.4",
+    "@radix-ui/react-tabs": "^1.1.11",
     "@supabase/supabase-js": "^2.49.4",
     "@types/xml2js": "^0.4.14",
     "class-variance-authority": "^0.7.1",

@@ -127,10 +127,11 @@ export default function ListingsPage() {
 
         // Filter by date
         if (selectedDate) {
-            const dateString = selectedDate.toISOString().split('T')[0]
-            filtered = filtered.filter(listing =>
-                listing.date.includes(dateString)
-            )
+            const selectedDateStr = format(selectedDate, 'yyyy-MM-dd')
+            filtered = filtered.filter(listing => {
+                const listingDate = format(new Date(listing.date), 'yyyy-MM-dd')
+                return listingDate === selectedDateStr
+            })
         }
 
         // Filter by meal type
@@ -479,11 +480,11 @@ export default function ListingsPage() {
                     {filteredListings.map((listing) => (
                         <Card
                             key={listing.id}
-                            className="overflow-hidden cursor-pointer hover:shadow-lg transition-shadow"
+                            className="overflow-hidden cursor-pointer hover:shadow-lg transition-shadow p-0"
                             onClick={() => router.push(`/mess/listings/${listing.id}`)}
                         >
-                            <CardHeader className="p-4 bg-main-foreground/5 border-b">
-                                <div className="flex items-center justify-between">
+                            <div className="p-4 relative">
+                                <div className="flex items-start justify-between mb-3">
                                     <div className="flex items-center gap-2">
                                         <MessIcon messName={listing.mess} />
                                         <div>
@@ -495,23 +496,21 @@ export default function ListingsPage() {
                                         {formatPrice(listing.min_price)}
                                     </div>
                                 </div>
-                            </CardHeader>
 
-                            <CardContent className="p-4">
-                                <div className="flex items-center gap-2 text-muted-foreground">
+                                <div className="flex items-center gap-2 text-muted-foreground mb-2">
                                     <CalendarDays className="h-4 w-4" />
                                     <p>{formatDate(listing.date)}</p>
                                 </div>
-                            </CardContent>
 
-                            <CardFooter className="p-4 bg-main-foreground/5 flex justify-between items-center border-t">
-                                <p className="text-xs text-muted-foreground">
-                                    {new Date(listing.created_at).toLocaleDateString()}
-                                </p>
-                                <p className="text-sm font-medium">
-                                    {listing.user_name}
-                                </p>
-                            </CardFooter>
+                                <div className="flex justify-between items-center mt-3 pt-3 border-t border-border/30">
+                                    <p className="text-xs text-muted-foreground">
+                                        {new Date(listing.created_at).toLocaleDateString()}
+                                    </p>
+                                    <p className="text-sm font-medium">
+                                        {listing.user_name}
+                                    </p>
+                                </div>
+                            </div>
                         </Card>
                     ))}
                 </div>

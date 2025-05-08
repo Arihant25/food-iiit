@@ -5,12 +5,13 @@ import { useRouter } from "next/navigation"
 import { useSession } from "next-auth/react"
 import { supabase } from "@/lib/supabaseClient"
 import { toast } from "sonner"
+import { formatRelativeTime, formatJoinDate } from "@/lib/utils"
 
 import { PageHeading } from "@/components/ui/page-heading"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import { Pencil, Save, User, Key, Phone } from "lucide-react"
+import { Pencil, Save, User, Key, Phone, Mail, Calendar, Clock, IdCard } from "lucide-react"
 
 interface UserProfile {
     id: string
@@ -128,101 +129,132 @@ export default function ProfilePage() {
 
     return (
         <div className="container mx-auto px-4 py-8">
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-8">
             <PageHeading title="My Profile" />
+            {profile && (
+                <div className="flex justify-end">
+                {!editing ? (
+                    <Button onClick={() => setEditing(true)} size="sm">
+                    <Pencil className="h-4 w-4 mr-2" />
+                    Edit Profile
+                    </Button>
+                ) : (
+                    <Button onClick={() => setEditing(false)} size="sm" variant="noShadow">
+                    Cancel
+                    </Button>
+                )}
+                </div>
+            )}
+            </div>
 
             {profile ? (
-                <div className="max-w-2xl mx-auto">
-                    <Card className="mb-8 overflow-hidden">
-                        <CardHeader className="bg-main-foreground/5">
-                            <div className="flex items-center justify-between">
-                                <CardTitle className="text-2xl">Profile Information</CardTitle>
-                                {!editing ? (
-                                    <Button onClick={() => setEditing(true)} size="sm">
-                                        <Pencil className="h-4 w-4 mr-2" />
-                                        Edit
-                                    </Button>
+                <div className="mx-auto">
+                    <div className="flex flex-col md:flex-wrap md:flex-row gap-4 justify-center">
+                        {/* Name */}
+                        <Card className="w-full md:w-auto">
+                            <CardContent className="p-6">
+                                <div className="flex items-center mb-2">
+                                    <User className="h-5 w-5 mr-2 text-primary" />
+                                    <h3 className="text-2xl font-bold text-muted-foreground">Name</h3>
+                                </div>
+                                <p className="text-lg break-words">{profile.name}</p>
+                            </CardContent>
+                        </Card>
+
+                        {/* Email */}
+                        <Card className="w-full md:w-auto">
+                            <CardContent className="p-6">
+                                <div className="flex items-center mb-2">
+                                    <Mail className="h-5 w-5 mr-2 text-primary" />
+                                    <h3 className="text-2xl font-bold text-muted-foreground">Email</h3>
+                                </div>
+                                <p className="text-lg break-words">{profile.email}</p>
+                            </CardContent>
+                        </Card>
+
+                        {/* Roll Number */}
+                        <Card className="w-full md:w-auto">
+                            <CardContent className="p-6">
+                                <div className="flex items-center mb-2">
+                                    <IdCard className="h-5 w-5 mr-2 text-primary" />
+                                    <h3 className="text-2xl font-bold text-muted-foreground">Roll Number</h3>
+                                </div>
+                                <p className="text-lg break-words">{profile.roll_number}</p>
+                            </CardContent>
+                        </Card>
+
+                        {/* Phone Number */}
+                        <Card className="w-full md:w-auto">
+                            <CardContent className="p-6">
+                                <div className="flex items-center mb-2">
+                                    <Phone className="h-5 w-5 mr-2 text-primary" />
+                                    <h3 className="text-2xl font-bold text-muted-foreground">Phone Number</h3>
+                                </div>
+                                {editing ? (
+                                    <Input
+                                        value={phoneNumber}
+                                        onChange={(e) => setPhoneNumber(e.target.value)}
+                                        placeholder="+91 9876543210"
+                                        className="mt-2"
+                                    />
                                 ) : (
-                                    <Button onClick={() => setEditing(false)} size="sm" variant="noShadow">
-                                        Cancel
-                                    </Button>
+                                    <p className="text-lg break-words">{profile.phone_number || "Not set"}</p>
                                 )}
-                            </div>
-                        </CardHeader>
-                        <CardContent className="p-6">
-                            <div className="space-y-6">
-                                {/* Non-editable fields */}
-                                <div>
-                                    <div className="flex items-center mb-2">
-                                        <User className="h-4 w-4 mr-2" />
-                                        <h3 className="text-sm font-medium text-muted-foreground">Name</h3>
-                                    </div>
-                                    <p className="text-lg">{profile.name}</p>
-                                </div>
+                            </CardContent>
+                        </Card>
 
-                                <div>
-                                    <h3 className="text-sm font-medium text-muted-foreground mb-2">Email</h3>
-                                    <p className="text-lg">{profile.email}</p>
+                        {/* API Key */}
+                        <Card className="w-full md:w-auto">
+                            <CardContent className="p-6">
+                                <div className="flex items-center mb-2">
+                                    <Key className="h-5 w-5 mr-2 text-primary" />
+                                    <h3 className="text-2xl font-bold text-muted-foreground">Mess API Key</h3>
                                 </div>
-
-                                <div>
-                                    <h3 className="text-sm font-medium text-muted-foreground mb-2">Roll Number</h3>
-                                    <p className="text-lg">{profile.roll_number}</p>
-                                </div>
-
-                                {/* Editable fields */}
-                                <div>
-                                    <div className="flex items-center mb-2">
-                                        <Phone className="h-4 w-4 mr-2" />
-                                        <h3 className="text-sm font-medium text-muted-foreground">Phone Number</h3>
-                                    </div>
-                                    {editing ? (
-                                        <Input
-                                            value={phoneNumber}
-                                            onChange={(e) => setPhoneNumber(e.target.value)}
-                                            placeholder="+91 9876543210"
-                                        />
-                                    ) : (
-                                        <p className="text-lg">{profile.phone_number || "Not set"}</p>
-                                    )}
-                                </div>
-
-                                <div>
-                                    <div className="flex items-center mb-2">
-                                        <Key className="h-4 w-4 mr-2" />
-                                        <h3 className="text-sm font-medium text-muted-foreground">Mess API Key</h3>
-                                    </div>
-                                    {editing ? (
-                                        <Input
-                                            type="password"
-                                            value={apiKey}
-                                            onChange={(e) => setApiKey(e.target.value)}
-                                            placeholder="Your Mess API Key"
-                                        />
-                                    ) : (
-                                        <p className="text-lg">
-                                            {profile.api_key ? "••••••••••••••••" : "Not set"}
-                                        </p>
-                                    )}
-                                </div>
-
-                                <div className="text-sm text-muted-foreground">
-                                    <p>Account created: {new Date(profile.created_at).toLocaleString()}</p>
-                                    <p>Last signed in: {new Date(profile.last_signed_in).toLocaleString()}</p>
-                                </div>
-
-                                {editing && (
-                                    <Button
-                                        onClick={handleSaveProfile}
-                                        disabled={isSaving}
-                                        className="w-full"
-                                    >
-                                        <Save className="h-4 w-4 mr-2" />
-                                        {isSaving ? "Saving..." : "Save Changes"}
-                                    </Button>
+                                {editing ? (
+                                    <Input
+                                        type="password"
+                                        value={apiKey}
+                                        onChange={(e) => setApiKey(e.target.value)}
+                                        placeholder="Your Mess API Key"
+                                        className="mt-2"
+                                    />
+                                ) : (
+                                    <p className="text-lg break-words">
+                                        {profile.api_key ? "••••••••••••••••" : "Not set"}
+                                    </p>
                                 )}
-                            </div>
-                        </CardContent>
-                    </Card>
+                            </CardContent>
+                        </Card>
+
+                        {/* Account Info */}
+                        <Card className="w-full md:w-auto">
+                            <CardContent className="p-6">
+                                <div className="space-y-3">
+                                    <div className="flex items-center">
+                                        <Calendar className="h-5 w-5 mr-2 text-primary" />
+                                        <p className="break-words">{formatJoinDate(profile.created_at)}</p>
+                                    </div>
+                                    <div className="flex items-center">
+                                        <Clock className="h-5 w-5 mr-2 text-primary" />
+                                        <p className="break-words">Last active {formatRelativeTime(profile.last_signed_in)}</p>
+                                    </div>
+                                </div>
+                            </CardContent>
+                        </Card>
+                    </div>
+
+                    {/* Save Button */}
+                    {editing && (
+                        <Button
+                            onClick={handleSaveProfile}
+                            disabled={isSaving}
+                            className="w-full mt-6"
+                            size="lg"
+                        >
+                            <Save className="h-4 w-4 mr-2" />
+                            {isSaving ? "Saving..." : "Save Changes"}
+                        </Button>
+                    )}
                 </div>
             ) : (
                 <div className="flex justify-center items-center h-64">

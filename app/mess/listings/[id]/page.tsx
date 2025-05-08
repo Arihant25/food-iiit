@@ -23,7 +23,22 @@ interface Listing {
     mess: string
     seller_id: string
     created_at: string
+    buyer_id?: string  // Add this optional property
     seller: {
+        name: string
+        email: string
+        phone_number: string | null
+    }
+}
+
+interface Bid {
+    id: string
+    buyer_roll_number: string
+    listing_id: string
+    bid_price: number
+    created_at: string
+    accepted: boolean
+    buyer?: {
         name: string
         email: string
         phone_number: string | null
@@ -37,15 +52,35 @@ export default function ListingDetailPage() {
 
     const [listing, setListing] = useState<Listing | null>(null)
     const [loading, setLoading] = useState(true)
+    const [bids, setBids] = useState<Bid[]>([])
+    const [userHasBid, setUserHasBid] = useState(false)
+    const [userBidAmount, setUserBidAmount] = useState(0)
     const [bidAmount, setBidAmount] = useState("")
     const [isSubmitting, setIsSubmitting] = useState(false)
+    const [completingTransaction, setCompletingTransaction] = useState(false)
     const [showAuthForm, setShowAuthForm] = useState(false)
 
     useEffect(() => {
         if (id) {
             fetchListing()
+            fetchBids()
         }
     }, [id])
+
+    // Check if current user has an existing bid on this listing
+    useEffect(() => {
+        if (session?.user?.rollNumber && bids.length > 0) {
+            const userBid = bids.find(bid => bid.buyer_roll_number === session.user.rollNumber)
+            if (userBid) {
+                setUserHasBid(true)
+                setUserBidAmount(userBid.bid_price)
+                setBidAmount(userBid.bid_price.toString())
+            } else {
+                setUserHasBid(false)
+                setUserBidAmount(0)
+            }
+        }
+    }, [session, bids])
 
     const fetchListing = async () => {
         try {
@@ -78,35 +113,183 @@ export default function ListingDetailPage() {
         }
     }
 
+    const fetchBids = async () => {
+        try {
+            const { data, error } = await supabase
+                .from("bids")
+                .select(`
+                    *
+                `)
+                .eq("listing_id", id)
+                .order("bid_price", { ascending: false })
+
+            if (error) throw error
+
+            // If we have bids, fetch the buyer information separately
+            if (data && data.length > 0) {
+                const buyerRollNumbers = data.map(bid => bid.buyer_roll_number);
+
+                // Get the buyer information
+                const { data: buyersData, error: buyersError } = await supabase
+                    .from("users")
+                    .select(`
+                        roll_number,
+                        name,
+                        email,
+                        phone_number
+                    `)
+                    .in("roll_number", buyerRollNumbers);
+
+                if (buyersError) throw buyersError;
+
+                // Combine the bid data with the buyer data
+                const formattedBids = data.map(bid => {
+                    const buyer = buyersData.find(u => u.roll_number === bid.buyer_roll_number);
+                    return {
+                        ...bid,
+                        buyer: buyer || null
+                    };
+                });
+
+                setBids(formattedBids as unknown as Bid[]);
+            } else {
+                setBids([]);
+            }
+        } catch (error) {
+            console.error("Error fetching bids:", error)
+            toast.error("Failed to load bids")
+        }
+    }
+
     const handleBid = async () => {
         if (!session?.user) {
             toast.error("You must be logged in to place a bid")
             return
         }
 
-        // Check if user has phone number and API key
-        if (!session.user.phoneNumber || !session.user.apiKey) {
+        // Check if user has phone number by querying the database
+        try {
+            const { data, error } = await supabase
+                .from('users')
+                .select('phone_number')
+                .eq('roll_number', session.user.rollNumber)
+                .single()
+
+            if (error || !data.phone_number) {
+                setShowAuthForm(true)
+                return
+            }
+        } catch (error) {
+            console.error("Error checking user phone number:", error)
             setShowAuthForm(true)
+            return
+        }
+
+        // Validate bid amount
+        const bidValue = parseFloat(bidAmount)
+        if (isNaN(bidValue) || bidValue < (listing?.min_price || 0)) {
+            toast.error(`Bid must be at least ₹${listing?.min_price}`)
             return
         }
 
         try {
             setIsSubmitting(true)
 
-            // Here you would add the bid to your system
-            // This is a placeholder for the actual bid logic
+            if (userHasBid) {
+                // Update existing bid
+                const { error } = await supabase
+                    .from("bids")
+                    .update({ bid_price: bidValue })
+                    .eq("buyer_roll_number", session.user.rollNumber)
+                    .eq("listing_id", id)
 
-            // For now, just simulate a successful bid
-            setTimeout(() => {
-                toast.success(`You've successfully placed a bid of ₹${bidAmount} for this meal`)
-                setBidAmount("")
-                setIsSubmitting(false)
-            }, 1000)
+                if (error) throw error
+                toast.success(`Your bid has been updated to ₹${bidValue}`)
+            } else {
+                // Create new bid
+                const { error } = await supabase
+                    .from("bids")
+                    .insert({
+                        buyer_roll_number: session.user.rollNumber,
+                        listing_id: id,
+                        bid_price: bidValue
+                    })
 
+                if (error) throw error
+                toast.success(`Your bid of ₹${bidValue} has been placed`)
+            }
+
+            // Refresh bids
+            fetchBids()
         } catch (error) {
             console.error("Error placing bid:", error)
             toast.error("Failed to place bid")
+        } finally {
             setIsSubmitting(false)
+        }
+    }
+
+    // Accept a bid for the listing (seller only)
+    const acceptBid = async (bidId: string, bidPrice: number, buyerRollNumber: string) => {
+        if (!session?.user || session.user.rollNumber !== listing?.seller_id) {
+            toast.error("Only the seller can accept bids")
+            return
+        }
+
+        if (!listing) {
+            toast.error("Listing information is missing")
+            return
+        }
+
+        try {
+            setCompletingTransaction(true)
+            // Mark the bid as accepted
+            const { error: bidError } = await supabase
+                .from("bids")
+                .update({ accepted: true })
+                .eq("id", bidId)
+
+            if (bidError) throw bidError
+
+            // Create transaction history entry immediately
+            const { error: txError } = await supabase
+                .from("transaction_history")
+                .insert({
+                    date_of_transaction: new Date().toISOString().split('T')[0],
+                    meal: listing.meal,
+                    mess: listing.mess,
+                    sold_price: bidPrice,
+                    listing_price: listing.min_price,
+                    buyer_id: buyerRollNumber,
+                    seller_id: listing.seller_id,
+                    listing_created_at: listing.created_at,
+                    sold_time: new Date().toISOString()
+                })
+
+            if (txError) throw txError
+
+            // Delete all bids for this listing
+            const { error: deleteBidsError } = await supabase
+                .from("bids")
+                .delete()
+                .eq("listing_id", id)
+
+            if (deleteBidsError) throw deleteBidsError
+
+            // Delete the listing
+            const { error: deleteListingError } = await supabase
+                .from("listings")
+                .delete()
+                .eq("id", id)
+
+            if (deleteListingError) throw deleteListingError
+
+            toast.success("Bid accepted and transaction completed successfully")
+            // Redirect to dashboard since this listing is now deleted
+            router.push("/mess/dashboard")
+        } catch (error) {
+            console.error("Error accepting bid:", error)
+            toast.error("Failed to accept bid")
         }
     }
 
@@ -246,12 +429,47 @@ export default function ListingDetailPage() {
                         </p>
                     </CardFooter>
                 </Card>
+
+                {/* Display bids section (visible to the seller only) */}
+                {session?.user?.rollNumber === listing.seller_id && !listing.buyer_id && bids.length > 0 && (
+                    <Card className="mb-8 overflow-hidden">
+                        <CardHeader className="bg-main-foreground/5">
+                            <CardTitle className="text-xl font-bold">Bids ({bids.length})</CardTitle>
+                        </CardHeader>
+                        <CardContent className="p-0 divide-y">
+                            {bids.map((bid) => (
+                                <div key={bid.id} className="p-4 flex justify-between items-center">
+                                    <div>
+                                        <p className="font-medium">{bid.buyer?.name}</p>
+                                        <p className="text-xl font-bold">
+                                            {new Intl.NumberFormat('en-IN', {
+                                                style: 'currency',
+                                                currency: 'INR',
+                                                minimumFractionDigits: 0,
+                                            }).format(bid.bid_price)}
+                                        </p>
+                                        <p className="text-xs text-muted-foreground">
+                                            Bid placed on {new Date(bid.created_at).toLocaleDateString()} at {new Date(bid.created_at).toLocaleTimeString()}
+                                        </p>
+                                    </div>
+                                    <Button
+                                        onClick={() => acceptBid(bid.id, bid.bid_price, bid.buyer_roll_number)}
+                                        disabled={bid.accepted}
+                                    >
+                                        {bid.accepted ? "Accepted" : "Accept Bid"}
+                                    </Button>
+                                </div>
+                            ))}
+                        </CardContent>
+                    </Card>
+                )}
             </div>
 
             {/* Auth form for users without phone/API key */}
             <UserAuthForm
                 isOpen={showAuthForm}
                 onClose={() => setShowAuthForm(false)}
+                requireApiKey={false} // Don't require API key for buyers placing bids
             />
         </div>
     )

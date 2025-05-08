@@ -23,14 +23,12 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog'
 
-// Form validation schema
+// Form validation schema with conditional API key validation
 const formSchema = z.object({
     phone_number: z.string().min(10, {
         message: "Phone number must be at least 10 digits.",
     }),
-    api_key: z.string().min(1, {
-        message: "API key is required.",
-    }),
+    api_key: z.string().optional(), // Make API key optional
 })
 
 type FormValues = z.infer<typeof formSchema>
@@ -38,9 +36,10 @@ type FormValues = z.infer<typeof formSchema>
 type UserAuthFormProps = {
     isOpen: boolean
     onClose: () => void
+    requireApiKey?: boolean // New prop to control whether API key is required
 }
 
-export default function UserAuthForm({ isOpen, onClose }: UserAuthFormProps) {
+export default function UserAuthForm({ isOpen, onClose, requireApiKey = false }: UserAuthFormProps) {
     const { data: session, update } = useSession()
     const [isSubmitting, setIsSubmitting] = useState(false)
     const [needsInfo, setNeedsInfo] = useState(false)
@@ -82,7 +81,7 @@ export default function UserAuthForm({ isOpen, onClose }: UserAuthFormProps) {
                     // If there's an error, we'll assume we need both fields
                     setMissingFields({
                         phone_number: true,
-                        api_key: true
+                        api_key: requireApiKey // Only require API key if specified
                     })
                     setNeedsInfo(true)
                     return
@@ -90,14 +89,14 @@ export default function UserAuthForm({ isOpen, onClose }: UserAuthFormProps) {
 
                 // Check which fields are missing in the database
                 const missingPhone = !data.phone_number
-                const missingApiKey = !data.api_key
+                const missingApiKey = requireApiKey ? !data.api_key : false // Only check for API key if required
 
                 setMissingFields({
                     phone_number: missingPhone,
                     api_key: missingApiKey
                 })
 
-                // Only show the form if at least one field is missing
+                // Only show the form if at least one required field is missing
                 setNeedsInfo(missingPhone || missingApiKey)
 
                 // Update form defaults
@@ -114,7 +113,7 @@ export default function UserAuthForm({ isOpen, onClose }: UserAuthFormProps) {
         }
 
         checkUserInfo()
-    }, [isOpen, session, form])
+    }, [isOpen, session, form, requireApiKey])
 
     const onSubmit = async (values: FormValues) => {
         if (!session?.user?.rollNumber) {
@@ -133,7 +132,7 @@ export default function UserAuthForm({ isOpen, onClose }: UserAuthFormProps) {
                 updateData.phone_number = values.phone_number
             }
 
-            if (missingFields.api_key) {
+            if (missingFields.api_key && values.api_key) {
                 updateData.api_key = values.api_key
             }
 
@@ -152,7 +151,7 @@ export default function UserAuthForm({ isOpen, onClose }: UserAuthFormProps) {
                 user: {
                     ...session.user,
                     phoneNumber: missingFields.phone_number ? values.phone_number : session.user.phoneNumber,
-                    apiKey: missingFields.api_key ? values.api_key : session.user.apiKey,
+                    apiKey: missingFields.api_key && values.api_key ? values.api_key : session.user.apiKey,
                 }
             })
 

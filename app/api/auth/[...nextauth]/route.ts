@@ -1,6 +1,7 @@
 import NextAuth from "next-auth";
 import CredentialsProvider from "next-auth/providers/credentials";
 import { parseStringPromise } from "xml2js";
+import { supabase } from "@/lib/supabaseClient";
 
 // Define the CAS attributes interface
 interface CASAttributes {
@@ -129,6 +130,52 @@ const handler = NextAuth({
             // Add user info to the token
             if (user) {
                 token.rollNumber = user.rollNumber;
+
+                // Check if user exists in our database, add if not
+                try {
+                    // First check if the user already exists
+                    const { data: existingUser, error: checkError } = await supabase
+                        .from('users')
+                        .select('id, last_signed_in')
+                        .eq('roll_number', user.rollNumber)
+                        .single();
+
+                    if (checkError && checkError.code !== 'PGRST116') { // PGRST116 is "no rows returned"
+                        console.error("Error checking if user exists:", checkError);
+                    }
+
+                    const currentTime = new Date().toISOString();
+
+                    if (!existingUser) {
+                        // User doesn't exist, add them to the database
+                        console.log(`Adding new user to database: ${user.name} (${user.rollNumber})`);
+                        const { error: insertError } = await supabase
+                            .from('users')
+                            .insert({
+                                name: user.name,
+                                roll_number: user.rollNumber,
+                                email: user.email,
+                                created_at: currentTime,
+                                last_signed_in: currentTime
+                            });
+
+                        if (insertError) {
+                            console.error("Error adding user to database:", insertError);
+                        }
+                    } else {
+                        // User exists, update last_signed_in time
+                        const { error: updateError } = await supabase
+                            .from('users')
+                            .update({ last_signed_in: currentTime })
+                            .eq('roll_number', user.rollNumber);
+
+                        if (updateError) {
+                            console.error("Error updating user sign-in time:", updateError);
+                        }
+                    }
+                } catch (error) {
+                    console.error("Error in user database operation:", error);
+                }
             }
             return token;
         },
