@@ -469,6 +469,7 @@ export default function CanteenPage() {
               }))}
               onAvatarClick={handleCanteenClick}
               selectedItemId={selectedCanteen?.id}
+              isCanteen={true}
             />
           )}
 

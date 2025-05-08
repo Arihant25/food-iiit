@@ -15,9 +15,9 @@ interface AvatarBannerProps {
     className?: string;
     onAvatarClick?: (item: AvatarItem) => void;
     selectedItemId?: string;
+    isCanteen?: boolean;
 }
-
-export default function AvatarBanner({ items, className, onAvatarClick, selectedItemId }: AvatarBannerProps) {
+export default function AvatarBanner({ items, className, onAvatarClick, selectedItemId, isCanteen = false }: AvatarBannerProps) {
     const handleAvatarClick = (item: AvatarItem) => {
         if (onAvatarClick) {
             onAvatarClick(item);
@@ -27,7 +27,8 @@ export default function AvatarBanner({ items, className, onAvatarClick, selected
     return (
         <div
             className={cn(
-                "fixed bottom-0 left-0 right-13 bg-background border-t-2 border-border py-2 z-50",
+                "fixed bottom-0 border-t-2 border-border py-2 z-50 bg-background",
+                isCanteen ? "left-0 right-13" : "right-0 left-12",
                 className
             )}
         >
