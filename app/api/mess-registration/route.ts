@@ -41,35 +41,46 @@ export async function GET(request: NextRequest) {
 
             if (error) {
                 console.error("Error fetching user API key:", error);
+                return NextResponse.json(
+                    { error: "User API key not found" },
+                    { status: 401 }
+                );
             } else if (data?.api_key) {
                 apiKey = data.api_key;
+            } else {
+                return NextResponse.json(
+                    { error: "User API key not set" },
+                    { status: 401 }
+                );
             }
+        } else {
+            return NextResponse.json(
+                { error: "User ID is required" },
+                { status: 400 }
+            );
         }
 
-        console.log("API Key:", apiKey);
+        console.log("Using API Key for user:", userId);
 
-        // Forward the request to the mess API with API key if available
+        // Forward the request to the mess API with API key
         const messApiUrl = `https://mess.iiit.ac.in/api/registration?meal=${meal}&date=${formattedDate}`;
-        const headers: HeadersInit = {};
-
-        // Add authorization header if we have the API key
-        if (apiKey) {
-            // Set the Authorization header with the API key
-            headers["Authorization"] = apiKey;
-        }
+        const headers: HeadersInit = {
+            "Authorization": apiKey,
+            "Content-Type": "application/json"
+        };
 
         const response = await fetch(messApiUrl, {
             headers,
             credentials: "include",
         });
 
-        // If unauthorized, return a special response indicating login is needed
+        // Handle various response statuses
         if (response.status === 401) {
+            console.error("Unauthorized access to mess API. Invalid API key.");
             return NextResponse.json(
                 {
-                    error: "Unauthorized",
-                    loginRequired: true,
-                    loginUrl: "https://mess.iiit.ac.in/api/auth/login/cas"
+                    error: "Invalid API key",
+                    loginRequired: true
                 },
                 { status: 401 }
             );
@@ -80,18 +91,16 @@ export async function GET(request: NextRequest) {
         if (!response.ok) {
             console.error("Error from mess API:", data);
             return NextResponse.json(
-                { error: "Failed to fetch from mess API" },
+                { error: "Failed to fetch from mess API", details: data },
                 { status: response.status }
             );
         }
-
-        console.log("Data from mess API:", data);
 
         return NextResponse.json(data);
     } catch (error) {
         console.error("Error fetching from mess API:", error);
         return NextResponse.json(
-            { error: "Failed to fetch from mess API" },
+            { error: "Failed to fetch from mess API", details: String(error) },
             { status: 500 }
         );
     }

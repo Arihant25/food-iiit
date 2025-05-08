@@ -4,10 +4,14 @@ import { useEffect, useState } from "react"
 import { useRouter } from "next/navigation"
 import { useSession } from "next-auth/react"
 import { supabase } from "@/lib/supabaseClient"
-import { Plus, Filter, Search } from "lucide-react"
+import { format } from "date-fns"
+import { Plus, Filter, Search, CalendarDays } from "lucide-react"
 import { toast } from "sonner"
+import { useDebounce } from "@/lib/hooks"
 
-import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
+import { PageHeading } from "@/components/ui/page-heading"
+import { MessIcon } from "@/components/ui/mess-icon"
+import { Card, CardContent, CardFooter, CardHeader } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { DatePicker } from "@/components/ui/date-picker"
@@ -27,6 +31,7 @@ import {
     DialogTitle,
     DialogTrigger,
 } from "@/components/ui/dialog"
+import UserAuthForm from "@/components/auth/UserAuthForm"
 
 interface Listing {
     id: string
@@ -49,8 +54,9 @@ export default function ListingsPage() {
     const [filteredListings, setFilteredListings] = useState<Listing[]>([])
     const [loading, setLoading] = useState(true)
     const [selectedDate, setSelectedDate] = useState<Date | undefined>(undefined)
-    const [mealFilter, setMealFilter] = useState<string>("")
-    const [searchQuery, setSearchQuery] = useState<string>("")
+    const [mealFilter, setMealFilter] = useState<string>("all")
+    const [searchInputValue, setSearchInputValue] = useState<string>("")
+    const searchQuery = useDebounce(searchInputValue, 300)
     const [showFilters, setShowFilters] = useState(false)
 
     // State for new listing form
@@ -62,13 +68,10 @@ export default function ListingsPage() {
         mess: ""
     })
     const [isMessLoading, setIsMessLoading] = useState(false)
-    const [messAuthRequired, setMessAuthRequired] = useState(false)
+    const [showAuthForm, setShowAuthForm] = useState(false)
 
     // Meal type options
     const mealTypes = ["Breakfast", "Lunch", "Snacks", "Dinner"]
-
-    // Mess options
-    const messOptions = ["Kadamba", "Yuktahar", "South Mess", "North Mess", "BBC", "Tantra", "David's"]
 
     // Fetch listings on component mount
     useEffect(() => {
@@ -131,17 +134,19 @@ export default function ListingsPage() {
         }
 
         // Filter by meal type
-        if (mealFilter) {
+        if (mealFilter && mealFilter !== "all") {
             filtered = filtered.filter(listing =>
                 listing.meal === mealFilter
             )
         }
 
-        // Filter by search query
+        // Filter by search query (search in mess name, seller name, and meal type)
         if (searchQuery.trim()) {
             const query = searchQuery.toLowerCase()
             filtered = filtered.filter(listing =>
-                listing.mess.toLowerCase().includes(query)
+                listing.mess.toLowerCase().includes(query) ||
+                listing.user_name.toLowerCase().includes(query) ||
+                listing.meal.toLowerCase().includes(query)
             )
         }
 
@@ -151,9 +156,15 @@ export default function ListingsPage() {
     // Reset all filters
     const resetFilters = () => {
         setSelectedDate(undefined)
-        setMealFilter("")
-        setSearchQuery("")
+        setMealFilter("all")
+        setSearchInputValue("")
         setFilteredListings(listings)
+    }
+
+    // Format date in the requested format: "28th May (Tue)"
+    const formatDate = (dateString: string) => {
+        const date = new Date(dateString)
+        return format(date, "do MMMM (EEE)")
     }
 
     // Fetch user's registered mess from the IIIT mess API via our proxy
@@ -171,12 +182,12 @@ export default function ListingsPage() {
 
             // Use our proxy API and pass the user's roll number to get their API key
             const response = await fetch(`/api/mess-registration?meal=${meal.toLowerCase()}&date=${formattedDate}&userId=${session.user.rollNumber}`)
+
             // Handle different response statuses
             if (response.status === 401) {
                 // User needs to authenticate with the mess system
-                const data = await response.json()
-                setMessAuthRequired(true)
-                toast.error("Please log in to the IIIT mess system first")
+                setShowAuthForm(true)
+                toast.error("Please update your API key")
                 return null
             }
 
@@ -223,30 +234,36 @@ export default function ListingsPage() {
 
     // Create a new listing
     const handleCreateListing = async (e: React.FormEvent) => {
-        e.preventDefault()
+        e.preventDefault();
 
         if (!session?.user) {
-            toast.error("You must be logged in to create a listing")
-            return
+            toast.error("You must be logged in to create a listing");
+            return;
         }
 
         // Validate the form
-        if (!newListing.date || !newListing.meal) {
-            toast.error("Please fill in all required fields")
-            return
+        if (!newListing.date || !newListing.meal || newListing.min_price <= 0) {
+            toast.error("Please fill in all required fields");
+            return;
         }
 
         try {
+            // Set loading state
+            setIsMessLoading(true);
+
             // Fetch the user's mess for the selected date and meal
-            const userMess = await fetchUserMess(newListing.date, newListing.meal)
+            const userMess = await fetchUserMess(newListing.date, newListing.meal);
 
             if (!userMess) {
-                return
+                toast.error("Failed to fetch your mess registration");
+                setIsMessLoading(false);
+                return;
             }
 
             // Format the mess name appropriately (remove any -veg/-nonveg suffix)
-            const messName = userMess.split('-')[0].charAt(0).toUpperCase() + userMess.split('-')[0].slice(1)
+            const messName = userMess.split('-')[0].charAt(0).toUpperCase() + userMess.split('-')[0].slice(1);
 
+            // Create the new listing in Supabase
             const { data, error } = await supabase
                 .from("listings")
                 .insert({
@@ -256,28 +273,35 @@ export default function ListingsPage() {
                     mess: messName,
                     seller_id: session.user.rollNumber, // Use roll number as seller_id
                 })
-                .select()
+                .select();
 
             if (error) {
-                console.error("Error creating listing:", error)
-                toast.error("Failed to create listing")
-                return
+                console.error("Error creating listing:", error);
+                toast.error(`Failed to create listing: ${error.message}`);
+                return;
             }
 
-            toast.success("Listing created successfully!")
-            setIsDialogOpen(false)
+
+            toast.success("Listing created successfully!");
+
+            // Reset form and close dialog
+            setIsDialogOpen(false);
             setNewListing({
                 min_price: 0,
                 date: "",
                 meal: "",
                 mess: ""
-            })
-            fetchListings()
+            });
+
+            // Refresh listings
+            fetchListings();
         } catch (error) {
-            console.error("Error:", error)
-            toast.error("An unexpected error occurred")
+            console.error("Error:", error);
+            toast.error(`An unexpected error occurred: ${error instanceof Error ? error.message : String(error)}`);
+        } finally {
+            setIsMessLoading(false);
         }
-    }
+    };
 
     // Format price to INR
     const formatPrice = (price: number) => {
@@ -290,8 +314,27 @@ export default function ListingsPage() {
 
     return (
         <div className="container mx-auto px-4 py-8">
-            <div className="mb-8 flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
-                <h1 className="text-3xl font-bold">Meal Listings</h1>
+            <PageHeading title="Meal Listings" />
+
+            <div className="mb-6 flex flex-wrap gap-4 items-center">
+                <div className="flex-1 relative min-w-[200px]">
+                    <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-foreground/50 h-4 w-4" />
+                    <Input
+                        placeholder="Search by mess, meal type, or seller..."
+                        value={searchInputValue}
+                        onChange={(e) => setSearchInputValue(e.target.value)}
+                        className="pl-10"
+                        type="search"
+                    />
+                </div>
+
+                <Button
+                    variant="noShadow"
+                    onClick={() => setShowFilters(!showFilters)}
+                >
+                    <Filter className="mr-2 h-4 w-4" />
+                    Filters
+                </Button>
 
                 {status === "authenticated" && (
                     <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
@@ -308,10 +351,10 @@ export default function ListingsPage() {
                                     List a mess meal for sale. Fill in the details below.
                                 </DialogDescription>
                             </DialogHeader>
-                            <form onSubmit={handleCreateListing}>
-                                <div className="grid gap-4 py-4">
-                                    <div className="grid grid-cols-4 items-center gap-4">
-                                        <label htmlFor="meal" className="text-right text-sm font-medium col-span-1">
+                            <form onSubmit={handleCreateListing} className="space-y-4">
+                                <div className="space-y-4">
+                                    <div>
+                                        <label htmlFor="meal" className="text-sm font-medium block mb-1">
                                             Meal
                                         </label>
                                         <Select
@@ -319,7 +362,7 @@ export default function ListingsPage() {
                                             value={newListing.meal}
                                             onValueChange={(value) => setNewListing({ ...newListing, meal: value })}
                                         >
-                                            <SelectTrigger className="col-span-3">
+                                            <SelectTrigger>
                                                 <SelectValue placeholder="Select meal" />
                                             </SelectTrigger>
                                             <SelectContent>
@@ -331,8 +374,9 @@ export default function ListingsPage() {
                                             </SelectContent>
                                         </Select>
                                     </div>
-                                    <div className="grid grid-cols-4 items-center gap-4">
-                                        <label htmlFor="min_price" className="text-right text-sm font-medium col-span-1">
+
+                                    <div>
+                                        <label htmlFor="min_price" className="text-sm font-medium block mb-1">
                                             Min Price (₹)
                                         </label>
                                         <Input
@@ -342,12 +386,12 @@ export default function ListingsPage() {
                                             min="0"
                                             value={newListing.min_price || ""}
                                             onChange={handleInputChange}
-                                            className="col-span-3"
                                             required
                                         />
                                     </div>
-                                    <div className="grid grid-cols-4 items-center gap-4">
-                                        <label htmlFor="date" className="text-right text-sm font-medium col-span-1">
+
+                                    <div>
+                                        <label htmlFor="date" className="text-sm font-medium block mb-1">
                                             Date
                                         </label>
                                         <Input
@@ -356,21 +400,25 @@ export default function ListingsPage() {
                                             type="date"
                                             value={newListing.date}
                                             onChange={handleInputChange}
-                                            className="col-span-3"
                                             required
                                         />
                                     </div>
+
                                     {isMessLoading && (
                                         <p className="text-center text-sm text-muted-foreground">
                                             Checking your mess registration...
                                         </p>
                                     )}
-                                    <p className="text-sm text-muted-foreground col-span-4 text-center">
-                                        Your registered mess will be automatically determined from the IIIT mess system
+
+                                    <p className="text-sm text-muted-foreground text-center">
+                                        Your registered mess will be automatically determined
                                     </p>
                                 </div>
+
                                 <DialogFooter>
-                                    <Button type="submit" disabled={isMessLoading}>Create Listing</Button>
+                                    <Button type="submit" disabled={isMessLoading}>
+                                        Create Listing
+                                    </Button>
                                 </DialogFooter>
                             </form>
                         </DialogContent>
@@ -378,29 +426,10 @@ export default function ListingsPage() {
                 )}
             </div>
 
-            {/* Filters and search */}
-            <div className="mb-6 space-y-4">
-                <div className="flex flex-wrap gap-2 items-center">
-                    <Input
-                        placeholder="Search by mess..."
-                        value={searchQuery}
-                        onChange={(e) => setSearchQuery(e.target.value)}
-                        className="max-w-xs"
-                        type="search"
-                    />
-
-                    <Button
-                        variant="noShadow"
-                        onClick={() => setShowFilters(!showFilters)}
-                        className="ml-auto"
-                    >
-                        <Filter className="mr-2 h-4 w-4" />
-                        Filters
-                    </Button>
-                </div>
-
-                {showFilters && (
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 p-4 bg-main-foreground/5 rounded-base">
+            {/* Filters */}
+            {showFilters && (
+                <div className="mb-6 p-4 bg-main-foreground/5 rounded-lg">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <div>
                             <p className="mb-2 text-sm font-medium">Date</p>
                             <DatePicker
@@ -419,7 +448,7 @@ export default function ListingsPage() {
                                     <SelectValue placeholder="All meals" />
                                 </SelectTrigger>
                                 <SelectContent>
-                                    <SelectItem value="">All meals</SelectItem>
+                                    <SelectItem value="all">All meals</SelectItem>
                                     {mealTypes.map((meal) => (
                                         <SelectItem key={meal} value={meal}>
                                             {meal}
@@ -432,13 +461,13 @@ export default function ListingsPage() {
                         <Button
                             variant="noShadow"
                             onClick={resetFilters}
-                            className="md:col-start-2"
+                            className="w-full md:w-auto md:col-start-2 mt-2"
                         >
                             Reset Filters
                         </Button>
                     </div>
-                )}
-            </div>
+                </div>
+            )}
 
             {/* Listings grid */}
             {loading ? (
@@ -448,36 +477,39 @@ export default function ListingsPage() {
             ) : filteredListings.length > 0 ? (
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                     {filteredListings.map((listing) => (
-                        <Card key={listing.id} className="overflow-hidden">
-                            <CardHeader>
-                                <CardTitle>{listing.mess}</CardTitle>
-                                <p className="text-sm text-muted-foreground">
-                                    Posted by {listing.user_name}
-                                </p>
+                        <Card
+                            key={listing.id}
+                            className="overflow-hidden cursor-pointer hover:shadow-lg transition-shadow"
+                            onClick={() => router.push(`/mess/listings/${listing.id}`)}
+                        >
+                            <CardHeader className="p-4 bg-main-foreground/5 border-b">
+                                <div className="flex items-center justify-between">
+                                    <div className="flex items-center gap-2">
+                                        <MessIcon messName={listing.mess} />
+                                        <div>
+                                            <h3 className="text-xl font-bold">{listing.mess}</h3>
+                                            <p className="text-lg">{listing.meal}</p>
+                                        </div>
+                                    </div>
+                                    <div className="text-2xl font-bold">
+                                        {formatPrice(listing.min_price)}
+                                    </div>
+                                </div>
                             </CardHeader>
-                            <CardContent>
-                                <div className="space-y-1">
-                                    <p className="text-sm"><span className="font-medium">Meal:</span> {listing.meal}</p>
-                                    <p className="text-sm"><span className="font-medium">Min Price:</span> {formatPrice(listing.min_price)}</p>
-                                    <p className="text-sm"><span className="font-medium">Date:</span> {new Date(listing.date).toLocaleDateString()}</p>
+
+                            <CardContent className="p-4">
+                                <div className="flex items-center gap-2 text-muted-foreground">
+                                    <CalendarDays className="h-4 w-4" />
+                                    <p>{formatDate(listing.date)}</p>
                                 </div>
                             </CardContent>
-                            <CardFooter className="flex justify-between">
-                                <Button
-                                    variant="noShadow"
-                                    size="sm"
-                                    onClick={() => {
-                                        if (session?.user) {
-                                            toast.success(`Contact info: ${listing.user_email}`)
-                                        } else {
-                                            toast.error("Please sign in to contact the seller")
-                                        }
-                                    }}
-                                >
-                                    Contact Seller
-                                </Button>
+
+                            <CardFooter className="p-4 bg-main-foreground/5 flex justify-between items-center border-t">
                                 <p className="text-xs text-muted-foreground">
                                     {new Date(listing.created_at).toLocaleDateString()}
+                                </p>
+                                <p className="text-sm font-medium">
+                                    {listing.user_name}
                                 </p>
                             </CardFooter>
                         </Card>
@@ -486,7 +518,7 @@ export default function ListingsPage() {
             ) : (
                 <div className="flex flex-col items-center justify-center h-64 text-center">
                     <p className="mb-4">No listings found.</p>
-                    {searchQuery || selectedDate || mealFilter ? (
+                    {searchInputValue || selectedDate || mealFilter !== "all" ? (
                         <Button onClick={resetFilters} variant="noShadow">
                             Clear Filters
                         </Button>
@@ -501,6 +533,12 @@ export default function ListingsPage() {
                     )}
                 </div>
             )}
+
+            {/* Auth form for users without phone/API key */}
+            <UserAuthForm
+                isOpen={showAuthForm}
+                onClose={() => setShowAuthForm(false)}
+            />
         </div>
     )
 }
