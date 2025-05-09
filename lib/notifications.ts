@@ -51,21 +51,21 @@ export async function sendNotification(
  */
 export const notificationMessages = {
     // For a seller when a new bid is placed
-    bidPlaced: (price: number, mess: string, meal: string) => ({
+    bidPlaced: (price: number, mess: string, meal: string, bidderName: string) => ({
         title: 'New Bid Received',
-        message: `Someone placed a bid of ₹${price} on your ${mess} ${meal} listing.`,
+        message: `${bidderName} placed a bid of ₹${price} on your ${mess} ${meal} listing.`,
     }),
 
     // For a buyer when their bid is accepted
-    bidAccepted: (price: number, mess: string, meal: string) => ({
+    bidAccepted: (price: number, mess: string, meal: string, sellerName: string, sellerPhoneNumber: string) => ({
         title: 'Bid Accepted!',
-        message: `Your bid of ₹${price} for ${mess} ${meal} has been accepted. Please contact the seller to complete the transaction.`,
+        message: `Your bid of ₹${price} for ${mess} ${meal} has been accepted. Please contact ${sellerName} at ${sellerPhoneNumber} to complete the transaction.`,
     }),
 
     // For a buyer when their bid is marked as paid
-    paymentMarked: (price: number, mess: string, meal: string) => ({
+    paymentMarked: (price: number, mess: string, meal: string, sellerName: string) => ({
         title: 'Payment Confirmed',
-        message: `Your payment of ₹${price} for ${mess} ${meal} has been confirmed by the seller.`,
+        message: `Your payment of ₹${price} for ${mess} ${meal} has been confirmed by ${sellerName}.`,
     }),
 
     // For a seller when a buyer has paid

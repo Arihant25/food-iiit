@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react"
 import { useSession } from "next-auth/react"
+import { useRouter } from "next/navigation" // Add router import
 import { supabase } from "@/lib/supabaseClient"
 import { format } from "date-fns"
 import { CalendarDays, ShoppingBag, ReceiptText, TagIcon } from "lucide-react"
@@ -62,6 +63,7 @@ interface Transaction {
 
 export default function DashboardPage() {
     const { data: session, status } = useSession()
+    const router = useRouter()
     const [soldListings, setSoldListings] = useState<Listing[]>([])
     const [purchasedListings, setPurchasedListings] = useState<Listing[]>([])
     const [myBids, setMyBids] = useState<bid[]>([])
@@ -411,6 +413,7 @@ export default function DashboardPage() {
                                 <Card
                                     key={listing.id}
                                     className="overflow-hidden cursor-pointer hover:shadow-lg transition-shadow"
+                                    onClick={() => router.push(`/mess/listings/${listing.id}`)}
                                 >
                                     <div className="p-4 relative">
                                         <div className="absolute top-4 right-4">
@@ -479,6 +482,7 @@ export default function DashboardPage() {
                                 <Card
                                     key={listing.id}
                                     className="overflow-hidden cursor-pointer hover:shadow-lg transition-shadow"
+                                    onClick={() => router.push(`/mess/listings/${listing.id}`)}
                                 >
                                     <div className="p-4 relative">
                                         <div className="absolute top-4 right-4">
@@ -539,7 +543,8 @@ export default function DashboardPage() {
                             {myBids.map((bid) => (
                                 <Card
                                     key={bid.id}
-                                    className="overflow-hidden hover:shadow-lg transition-shadow"
+                                    className="overflow-hidden hover:shadow-lg transition-shadow cursor-pointer"
+                                    onClick={() => router.push(`/mess/listings/${bid.listing_id}`)}
                                 >
                                     <div className="p-4 relative">
                                         <div className="absolute top-4 right-4">

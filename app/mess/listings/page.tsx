@@ -1,17 +1,18 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import React, { useEffect, useState, useRef } from "react"
 import { useRouter } from "next/navigation"
 import { useSession } from "next-auth/react"
 import { supabase } from "@/lib/supabaseClient"
 import { format } from "date-fns"
-import { Plus, Filter, Search, CalendarDays } from "lucide-react"
+import { Plus, Filter, Search, CalendarDays, MessageSquare } from "lucide-react"
 import { toast } from "sonner"
 import { useDebounce } from "@/lib/hooks"
+import { formatRelativeTime } from "@/lib/utils"
 
 import { PageHeading } from "@/components/ui/page-heading"
 import { MessIcon } from "@/components/ui/mess-icon"
-import { Card, CardContent, CardFooter, CardHeader } from "@/components/ui/card"
+import { Card } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { DatePicker } from "@/components/ui/date-picker"
@@ -43,6 +44,7 @@ interface Listing {
     created_at: string
     user_name: string
     user_email: string
+    bid_count: number
 }
 
 export default function ListingsPage() {
@@ -55,9 +57,24 @@ export default function ListingsPage() {
     const [loading, setLoading] = useState(true)
     const [selectedDate, setSelectedDate] = useState<Date | undefined>(undefined)
     const [mealFilter, setMealFilter] = useState<string>("all")
+    const [messFilter, setMessFilter] = useState<string>("all")
     const [searchInputValue, setSearchInputValue] = useState<string>("")
     const searchQuery = useDebounce(searchInputValue, 300)
     const [showFilters, setShowFilters] = useState(false)
+    const filterRef = useRef<HTMLDivElement>(null)
+
+    // Animation for filter menu
+    useEffect(() => {
+        if (filterRef.current) {
+            if (showFilters) {
+                filterRef.current.style.maxHeight = `${filterRef.current.scrollHeight}px`
+                filterRef.current.style.opacity = '1'
+            } else {
+                filterRef.current.style.maxHeight = '0'
+                filterRef.current.style.opacity = '0'
+            }
+        }
+    }, [showFilters])
 
     // State for new listing form
     const [isDialogOpen, setIsDialogOpen] = useState(false)
@@ -81,12 +98,13 @@ export default function ListingsPage() {
     // Apply filters whenever filters change
     useEffect(() => {
         applyFilters()
-    }, [listings, selectedDate, mealFilter, searchQuery])
+    }, [listings, selectedDate, mealFilter, messFilter, searchQuery])
 
     // Fetch listings from Supabase
     const fetchListings = async () => {
         try {
             setLoading(true)
+            // First fetch all listings
             const { data, error } = await supabase
                 .from("listings")
                 .select(`
@@ -104,11 +122,35 @@ export default function ListingsPage() {
                 return
             }
 
-            // Transform the data to include user information
+            // Get all listing IDs to fetch their bid counts
+            const listingIds = data.map(listing => listing.id)
+
+            // Initialize bid counts for all listings
+            const bidCountMap = new Map<string, number>()
+
+            // If there are listings, fetch their bid counts
+            if (listingIds.length > 0) {
+                // Get the count of bids for each listing
+                const { data: bidCountsData, error: bidCountsError } = await supabase
+                    .from("bids")
+                    .select('listing_id')
+                    .in('listing_id', listingIds)
+
+                if (!bidCountsError && bidCountsData) {
+                    // Count bids per listing
+                    bidCountsData.forEach((bid: { listing_id: string }) => {
+                        const count = bidCountMap.get(bid.listing_id) || 0
+                        bidCountMap.set(bid.listing_id, count + 1)
+                    })
+                }
+            }
+
+            // Transform the data to include user information and bid count
             const formattedListings = data.map(item => ({
                 ...item,
                 user_name: item.users ? item.users.name : "Unknown User",
                 user_email: item.users ? item.users.email : "",
+                bid_count: bidCountMap.get(item.id) || 0,
             }))
 
             setListings(formattedListings)
@@ -141,6 +183,13 @@ export default function ListingsPage() {
             )
         }
 
+        // Filter by mess
+        if (messFilter && messFilter !== "all") {
+            filtered = filtered.filter(listing =>
+                listing.mess === messFilter
+            )
+        }
+
         // Filter by search query (search in mess name, seller name, and meal type)
         if (searchQuery.trim()) {
             const query = searchQuery.toLowerCase()
@@ -158,6 +207,7 @@ export default function ListingsPage() {
     const resetFilters = () => {
         setSelectedDate(undefined)
         setMealFilter("all")
+        setMessFilter("all")
         setSearchInputValue("")
         setFilteredListings(listings)
     }
@@ -244,7 +294,7 @@ export default function ListingsPage() {
         }
 
         // Validate the form
-        if (!newListing.date || !newListing.meal || newListing.min_price <= 0) {
+        if (!newListing.date || !newListing.meal || newListing.min_price < 0 || newListing.min_price === undefined) {
             toast.error("Please fill in all required fields");
             return;
         }
@@ -300,7 +350,6 @@ export default function ListingsPage() {
                 return;
             }
 
-
             toast.success("Listing created successfully!");
 
             // Reset form and close dialog
@@ -332,9 +381,8 @@ export default function ListingsPage() {
     }
 
     return (
-        <div className="container mx-auto px-4 py-8">
+        <div className="container mx-auto px-4 py-6">
             <PageHeading title="Meal Listings" />
-
             <div className="mb-6 flex flex-wrap gap-4 items-center">
                 <div className="flex-1 relative min-w-[200px]">
                     <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-foreground/50 h-4 w-4" />
@@ -350,9 +398,10 @@ export default function ListingsPage() {
                 <Button
                     variant="noShadow"
                     onClick={() => setShowFilters(!showFilters)}
+                    className="flex items-center"
                 >
-                    <Filter className="mr-2 h-4 w-4" />
-                    Filters
+                    <Filter className={`mr-2 h-4 w-4 ${showFilters ? 'rotate-180' : 'rotate-0'} transition-transform duration-300`} />
+                    {showFilters ? 'Hide Filters' : 'Show Filters'}
                 </Button>
 
                 {status === "authenticated" && (
@@ -403,7 +452,8 @@ export default function ListingsPage() {
                                             name="min_price"
                                             type="number"
                                             min="0"
-                                            value={newListing.min_price || ""}
+                                            step="1"
+                                            value={newListing.min_price === 0 ? "0" : newListing.min_price || ""}
                                             onChange={handleInputChange}
                                             required
                                         />
@@ -446,47 +496,72 @@ export default function ListingsPage() {
             </div>
 
             {/* Filters */}
-            {showFilters && (
-                <div className="mb-6 p-4 bg-main-foreground/5 rounded-lg">
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <div>
-                            <p className="mb-2 text-sm font-medium">Date</p>
-                            <DatePicker
-                                date={selectedDate}
-                                setDate={setSelectedDate}
-                            />
-                        </div>
-
-                        <div>
-                            <p className="mb-2 text-sm font-medium">Meal</p>
-                            <Select
-                                value={mealFilter}
-                                onValueChange={setMealFilter}
-                            >
-                                <SelectTrigger>
-                                    <SelectValue placeholder="All meals" />
-                                </SelectTrigger>
-                                <SelectContent>
-                                    <SelectItem value="all">All meals</SelectItem>
-                                    {mealTypes.map((meal) => (
-                                        <SelectItem key={meal} value={meal}>
-                                            {meal}
-                                        </SelectItem>
-                                    ))}
-                                </SelectContent>
-                            </Select>
-                        </div>
-
-                        <Button
-                            variant="noShadow"
-                            onClick={resetFilters}
-                            className="w-full md:w-auto md:col-start-2 mt-2"
-                        >
-                            Reset Filters
-                        </Button>
+            <div
+                ref={filterRef}
+                className="mb-6 p-4 bg-main-foreground/5 rounded-lg overflow-hidden transition-all duration-300 ease-in-out"
+                style={{ maxHeight: showFilters ? '1000px' : '0', opacity: showFilters ? '1' : '0' }}
+            >
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div>
+                        <p className="mb-2 text-sm font-medium">Date</p>
+                        <DatePicker
+                            date={selectedDate}
+                            setDate={setSelectedDate}
+                        />
                     </div>
+
+                    <div>
+                        <p className="mb-2 text-sm font-medium">Meal</p>
+                        <Select
+                            value={mealFilter}
+                            onValueChange={setMealFilter}
+                        >
+                            <SelectTrigger>
+                                <SelectValue placeholder="All meals" />
+                            </SelectTrigger>
+                            <SelectContent>
+                                <SelectItem value="all">All meals</SelectItem>
+                                {mealTypes.map((meal) => (
+                                    <SelectItem key={meal} value={meal}>
+                                        {meal}
+                                    </SelectItem>
+                                ))}
+                            </SelectContent>
+                        </Select>
+                    </div>
+
+                    <div>
+                        <p className="mb-2 text-sm font-medium">Mess</p>
+                        <Select
+                            value={messFilter}
+                            onValueChange={setMessFilter}
+                        >
+                            <SelectTrigger>
+                                <SelectValue placeholder="All messes" />
+                            </SelectTrigger>
+                            <SelectContent>
+                                <SelectItem value="all">All messes</SelectItem>
+                                {["North", "South", "Yuktahar", "Kadamba"].map((mess) => (
+                                    <SelectItem key={mess} value={mess} className="flex items-center">
+                                        <div className="flex items-center">
+                                            <MessIcon messName={mess} size={16} className="mr-2" />
+                                            {mess}
+                                        </div>
+                                    </SelectItem>
+                                ))}
+                            </SelectContent>
+                        </Select>
+                    </div>
+
+                    <Button
+                        variant="noShadow"
+                        onClick={resetFilters}
+                        className="w-full md:w-auto md:col-start-3 mt-2"
+                    >
+                        Reset Filters
+                    </Button>
                 </div>
-            )}
+            </div>
 
             {/* Listings grid */}
             {loading ? (
@@ -498,34 +573,41 @@ export default function ListingsPage() {
                     {filteredListings.map((listing) => (
                         <Card
                             key={listing.id}
-                            className="overflow-hidden cursor-pointer hover:shadow-lg transition-shadow p-0"
+                            className="overflow-hidden cursor-pointer hover:shadow-lg transition-shadow"
                             onClick={() => router.push(`/mess/listings/${listing.id}`)}
                         >
-                            <div className="p-4 relative">
-                                <div className="flex items-start justify-between mb-3">
+                            <div className="p-5">
+                                {/* Mess name and price row */}
+                                <div className="flex items-start justify-between mb-4">
                                     <div className="flex items-center gap-2">
-                                        <MessIcon messName={listing.mess} />
-                                        <div>
-                                            <h3 className="text-xl font-bold">{listing.mess}</h3>
-                                            <p className="text-lg">{listing.meal}</p>
-                                        </div>
+                                        <MessIcon messName={listing.mess} size={24} />
+                                        <h3 className="text-xl font-bold">{listing.mess}</h3>
                                     </div>
                                     <div className="text-2xl font-bold">
                                         {formatPrice(listing.min_price)}
                                     </div>
                                 </div>
 
-                                <div className="flex items-center gap-2 text-muted-foreground mb-2">
-                                    <CalendarDays className="h-4 w-4" />
-                                    <p>{formatDate(listing.date)}</p>
+                                {/* Meal and date row */}
+                                <div className="flex items-center justify-between mb-4">
+                                    <p className="text-lg font-medium">{listing.meal}</p>
+                                    <div className="flex items-center gap-2">
+                                        <CalendarDays className="h-4 w-4 text-muted-foreground" />
+                                        <p className="font-semibold text-md">{formatDate(listing.date)}</p>
+                                    </div>
                                 </div>
 
-                                <div className="flex justify-between items-center mt-3 pt-3 border-t border-border/30">
-                                    <p className="text-xs text-muted-foreground">
-                                        {new Date(listing.created_at).toLocaleDateString()}
-                                    </p>
+                                {/* Bids count, seller name, and relative time */}
+                                <div className="flex justify-between items-center pt-3 border-t border-border/30">
+                                    <div className="flex items-center gap-1">
+                                        <MessageSquare className="h-4 w-4 text-muted-foreground" />
+                                        <span className="text-sm">{listing.bid_count} {listing.bid_count === 1 ? 'bid' : 'bids'}</span>
+                                    </div>
                                     <p className="text-sm font-medium">
                                         {listing.user_name}
+                                    </p>
+                                    <p className="text-xs text-muted-foreground">
+                                        {formatRelativeTime(listing.created_at)}
                                     </p>
                                 </div>
                             </div>

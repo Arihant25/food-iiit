@@ -186,6 +186,11 @@ export default function ListingDetailPage() {
             return
         }
 
+        if (!listing) {
+            toast.error("Listing details are not available to place a bid.");
+            return;
+        }
+
         // Validate bid amount
         const bidValue = parseFloat(bidAmount)
         if (isNaN(bidValue) || bidValue < (listing?.min_price || 0)) {
@@ -197,6 +202,14 @@ export default function ListingDetailPage() {
             setIsSubmitting(true)
 
             if (userHasBid) {
+                // Check if the existing bid is already accepted
+                const existingBid = bids.find(b => b.buyer_roll_number === session.user.rollNumber && b.listing_id === id);
+                if (existingBid && existingBid.accepted) {
+                    toast.error("This bid has already been accepted and cannot be updated.");
+                    setIsSubmitting(false);
+                    return;
+                }
+
                 // Update existing bid
                 const { error } = await supabase
                     .from("bids")
@@ -246,7 +259,7 @@ export default function ListingDetailPage() {
                     // Import dynamically to avoid server-side issues
                     const { sendNotification, notificationMessages } = await import('@/lib/notifications')
 
-                    const notif = notificationMessages.bidPlaced(bidValue, listing.mess, listing.meal)
+                    const notif = notificationMessages.bidPlaced(bidValue, listing.mess, listing.meal, session.user.name || "A bidder")
 
                     await sendNotification(
                         listing.seller_id,
@@ -303,7 +316,9 @@ export default function ListingDetailPage() {
                 // Import dynamically to avoid server-side issues
                 const { sendNotification, notificationMessages } = await import('@/lib/notifications')
 
-                const notif = notificationMessages.bidAccepted(bidPrice, listing.mess, listing.meal)
+                const sellerName = listing.seller.name;
+                const sellerPhoneNumber = listing.seller.phone_number || "N/A";
+                const notif = notificationMessages.bidAccepted(bidPrice, listing.mess, listing.meal, sellerName, sellerPhoneNumber)
 
                 await sendNotification(
                     buyerRollNumber,
@@ -377,7 +392,8 @@ export default function ListingDetailPage() {
                 // Import dynamically to avoid server-side issues
                 const { sendNotification, notificationMessages } = await import('@/lib/notifications')
 
-                const buyerNotif = notificationMessages.paymentMarked(bidPrice, listing.mess, listing.meal)
+                const sellerName = listing.seller.name;
+                const buyerNotif = notificationMessages.paymentMarked(bidPrice, listing.mess, listing.meal, sellerName)
                 await sendNotification(
                     buyerRollNumber,
                     'payment_marked',
@@ -398,7 +414,7 @@ export default function ListingDetailPage() {
                 const sellerNotif = notificationMessages.paymentReceived(bidPrice, listing.mess, listing.meal)
                 await sendNotification(
                     listing.seller_id,
-                    'payment_marked',
+                    'payment_marked', // Should this be 'payment_received' type? The message is paymentReceived.
                     sellerNotif.title,
                     sellerNotif.message,
                     {
