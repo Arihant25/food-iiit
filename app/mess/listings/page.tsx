@@ -90,10 +90,141 @@ export default function ListingsPage() {
     // Meal type options
     const mealTypes = ["Breakfast", "Lunch", "Snacks", "Dinner"]
 
-    // Fetch listings on component mount
+    // Fetch listings on component mount and set up real-time subscriptions
     useEffect(() => {
         fetchListings()
+
+        // Set up real-time subscriptions
+        const listingsChannel = supabase
+            .channel('public:listings')
+            .on('postgres_changes',
+                {
+                    event: '*',
+                    schema: 'public',
+                    table: 'listings'
+                },
+                (payload) => {
+                    // Refresh listings when data changes
+                    fetchListings()
+                }
+            )
+            .subscribe()
+
+        const bidsChannel = supabase
+            .channel('public:bids')
+            .on('postgres_changes',
+                {
+                    event: '*',
+                    schema: 'public',
+                    table: 'bids'
+                },
+                (payload) => {
+                    // When a bid changes, just update the affected listing's bid count
+                    // without fetching all listings again
+                    const listingId = payload.new?.listing_id || payload.old?.listing_id
+
+                    if (listingId) {
+                        if (payload.eventType === 'INSERT') {
+                            // Increment bid count for the specific listing
+                            setListings(prevListings =>
+                                prevListings.map(listing =>
+                                    listing.id === listingId
+                                        ? { ...listing, bid_count: (listing.bid_count || 0) + 1 }
+                                        : listing
+                                )
+                            );
+
+                            // Also update filtered listings
+                            setFilteredListings(prevFiltered => {
+                                const targetListing = prevFiltered.find(listing => listing.id === listingId);
+                                if (targetListing) {
+                                    return prevFiltered.map(listing =>
+                                        listing.id === listingId
+                                            ? { ...listing, bid_count: (listing.bid_count || 0) + 1 }
+                                            : listing
+                                    );
+                                }
+                                return prevFiltered;
+                            });
+                        } else if (payload.eventType === 'DELETE') {
+                            // Decrement bid count for the specific listing
+                            setListings(prevListings =>
+                                prevListings.map(listing =>
+                                    listing.id === listingId
+                                        ? { ...listing, bid_count: Math.max(0, (listing.bid_count || 0) - 1) }
+                                        : listing
+                                )
+                            );
+
+                            // Also update filtered listings
+                            setFilteredListings(prevFiltered => {
+                                const targetListing = prevFiltered.find(listing => listing.id === listingId);
+                                if (targetListing) {
+                                    return prevFiltered.map(listing =>
+                                        listing.id === listingId
+                                            ? { ...listing, bid_count: Math.max(0, (listing.bid_count || 0) - 1) }
+                                            : listing
+                                    );
+                                }
+                                return prevFiltered;
+                            });
+                        } else {
+                            // For updates or other events, fetch the current count
+                            updateBidCountForListing(listingId)
+                        }
+                    }
+                }
+            )
+            .subscribe()
+
+        // Clean up subscriptions on unmount
+        return () => {
+            supabase.removeChannel(listingsChannel)
+            supabase.removeChannel(bidsChannel)
+        }
     }, [])
+
+    // Update bid count for a specific listing
+    const updateBidCountForListing = async (listingId: string) => {
+        try {
+            // Get the count of bids for the specific listing
+            const { data, error } = await supabase
+                .from("bids")
+                .select('id', { count: 'exact' })
+                .eq('listing_id', listingId)
+
+            if (error) {
+                console.error("Error fetching bid count:", error)
+                return
+            }
+
+            const count = data.length
+
+            // Update both listings and filteredListings with the new bid count
+            setListings(prevListings => {
+                const updatedListings = prevListings.map(listing =>
+                    listing.id === listingId
+                        ? { ...listing, bid_count: count }
+                        : listing
+                );
+                return updatedListings;
+            });
+
+            setFilteredListings(prevFiltered => {
+                const targetListing = prevFiltered.find(listing => listing.id === listingId);
+                if (targetListing) {
+                    return prevFiltered.map(listing =>
+                        listing.id === listingId
+                            ? { ...listing, bid_count: count }
+                            : listing
+                    );
+                }
+                return prevFiltered; // No changes if the listing is not in filtered list
+            });
+        } catch (error) {
+            console.error("Error updating bid count:", error)
+        }
+    }
 
     // Apply filters whenever filters change
     useEffect(() => {
@@ -311,7 +442,6 @@ export default function ListingsPage() {
                 .single();
 
             if (userError || !userData?.api_key) {
-                console.log("API key not found or error fetching user data");
                 // Show the auth form since API key is null
                 setShowAuthForm(true);
                 setIsDialogOpen(false); // Close the listing creation dialog
@@ -383,125 +513,51 @@ export default function ListingsPage() {
     return (
         <div className="container mx-auto px-4 py-6">
             <PageHeading title="Meal Listings" />
-            <div className="mb-6 flex flex-wrap gap-4 items-center">
-                <div className="flex-1 relative min-w-[200px]">
-                    <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-foreground/50 h-4 w-4" />
+            {/* Search and Filter Controls */}
+            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
+                <div className="flex-1 relative min-w-[200px] w-full sm:w-auto">
+                    <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
                     <Input
-                        placeholder="Search by mess, meal type, or seller..."
+                        type="search"
+                        placeholder="Search listings..."
+                        className="pl-8 w-full"
                         value={searchInputValue}
                         onChange={(e) => setSearchInputValue(e.target.value)}
-                        className="pl-10"
-                        type="search"
                     />
                 </div>
-
-                <Button
-                    variant="noShadow"
-                    onClick={() => setShowFilters(!showFilters)}
-                    className="flex items-center"
-                >
-                    <Filter className={`mr-2 h-4 w-4 ${showFilters ? 'rotate-180' : 'rotate-0'} transition-transform duration-300`} />
-                    {showFilters ? 'Hide Filters' : 'Show Filters'}
-                </Button>
-
-                {status === "authenticated" && (
-                    <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-                        <DialogTrigger asChild>
-                            <Button>
-                                <Plus className="mr-2 h-4 w-4" />
-                                Create Listing
-                            </Button>
-                        </DialogTrigger>
-                        <DialogContent className="sm:max-w-[500px]">
-                            <DialogHeader>
-                                <DialogTitle>Create New Listing</DialogTitle>
-                                <DialogDescription>
-                                    List a mess meal for sale. Fill in the details below.
-                                </DialogDescription>
-                            </DialogHeader>
-                            <form onSubmit={handleCreateListing} className="space-y-4">
-                                <div className="space-y-4">
-                                    <div>
-                                        <label htmlFor="meal" className="text-sm font-medium block mb-1">
-                                            Meal
-                                        </label>
-                                        <Select
-                                            name="meal"
-                                            value={newListing.meal}
-                                            onValueChange={(value) => setNewListing({ ...newListing, meal: value })}
-                                        >
-                                            <SelectTrigger>
-                                                <SelectValue placeholder="Select meal" />
-                                            </SelectTrigger>
-                                            <SelectContent>
-                                                {mealTypes.map((meal) => (
-                                                    <SelectItem key={meal} value={meal}>
-                                                        {meal}
-                                                    </SelectItem>
-                                                ))}
-                                            </SelectContent>
-                                        </Select>
-                                    </div>
-
-                                    <div>
-                                        <label htmlFor="min_price" className="text-sm font-medium block mb-1">
-                                            Min Price (₹)
-                                        </label>
-                                        <Input
-                                            id="min_price"
-                                            name="min_price"
-                                            type="number"
-                                            min="0"
-                                            step="1"
-                                            value={newListing.min_price === 0 ? "0" : newListing.min_price || ""}
-                                            onChange={handleInputChange}
-                                            required
-                                        />
-                                    </div>
-
-                                    <div>
-                                        <label htmlFor="date" className="text-sm font-medium block mb-1">
-                                            Date
-                                        </label>
-                                        <Input
-                                            id="date"
-                                            name="date"
-                                            type="date"
-                                            value={newListing.date}
-                                            onChange={handleInputChange}
-                                            required
-                                        />
-                                    </div>
-
-                                    {isMessLoading && (
-                                        <p className="text-center text-sm text-muted-foreground">
-                                            Checking your mess registration...
-                                        </p>
-                                    )}
-
-                                    <p className="text-sm text-muted-foreground text-center">
-                                        Your registered mess will be automatically determined
-                                    </p>
-                                </div>
-
-                                <DialogFooter>
-                                    <Button type="submit" disabled={isMessLoading}>
-                                        Create Listing
-                                    </Button>
-                                </DialogFooter>
-                            </form>
-                        </DialogContent>
-                    </Dialog>
-                )}
+                <div className="flex flex-wrap gap-2 w-full sm:w-auto">
+                    <Button
+                        variant="outline"
+                        size="sm"
+                        className="flex items-center"
+                        onClick={() => setShowFilters(!showFilters)}
+                    >
+                        <Filter className="mr-2 h-4 w-4" />
+                        Filters
+                    </Button>
+                    {session?.user ? (
+                        <Button
+                            variant="default"
+                            size="sm"
+                            onClick={() => setIsDialogOpen(true)}
+                        >
+                            <Plus className="mr-2 h-4 w-4" />
+                            Create Listing
+                        </Button>
+                    ) : (
+                        <div className="text-sm text-muted-foreground flex items-center">
+                            Sign in to create a listing
+                        </div>
+                    )}
+                </div>
             </div>
-
             {/* Filters */}
             <div
                 ref={filterRef}
                 className="mb-6 p-4 bg-main-foreground/5 rounded-lg overflow-hidden transition-all duration-300 ease-in-out"
                 style={{ maxHeight: showFilters ? '1000px' : '0', opacity: showFilters ? '1' : '0' }}
             >
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
                     <div>
                         <p className="mb-2 text-sm font-medium">Date</p>
                         <DatePicker
@@ -509,54 +565,55 @@ export default function ListingsPage() {
                             setDate={setSelectedDate}
                         />
                     </div>
-
                     <div>
                         <p className="mb-2 text-sm font-medium">Meal</p>
                         <Select
                             value={mealFilter}
                             onValueChange={setMealFilter}
                         >
-                            <SelectTrigger>
-                                <SelectValue placeholder="All meals" />
+                            <SelectTrigger className="w-full">
+                                <SelectValue placeholder="Select meal" />
                             </SelectTrigger>
                             <SelectContent>
-                                <SelectItem value="all">All meals</SelectItem>
+                                <SelectItem value="all">All Meals</SelectItem>
                                 {mealTypes.map((meal) => (
-                                    <SelectItem key={meal} value={meal}>
-                                        {meal}
-                                    </SelectItem>
+                                    <SelectItem key={meal} value={meal}>{meal}</SelectItem>
                                 ))}
                             </SelectContent>
                         </Select>
                     </div>
-
                     <div>
                         <p className="mb-2 text-sm font-medium">Mess</p>
                         <Select
                             value={messFilter}
                             onValueChange={setMessFilter}
                         >
-                            <SelectTrigger>
-                                <SelectValue placeholder="All messes" />
+                            <SelectTrigger className="w-full">
+                                <SelectValue placeholder="Select mess" />
                             </SelectTrigger>
                             <SelectContent>
-                                <SelectItem value="all">All messes</SelectItem>
-                                {["North", "South", "Yuktahar", "Kadamba"].map((mess) => (
+                                <SelectItem value="all">All Messes</SelectItem>
+                                {["Yuktahaar", "South", "North", "Kadamba"].map((mess) => (
                                     <SelectItem key={mess} value={mess} className="flex items-center">
                                         <div className="flex items-center">
-                                            <MessIcon messName={mess} size={16} className="mr-2" />
-                                            {mess}
+                                            <MessIcon messName={mess} size={18} />
+                                            <span className="ml-2">{mess}</span>
                                         </div>
                                     </SelectItem>
                                 ))}
                             </SelectContent>
                         </Select>
                     </div>
-
+                </div>
+                <div className="flex justify-end mt-4">
                     <Button
-                        variant="noShadow"
-                        onClick={resetFilters}
-                        className="w-full md:w-auto md:col-start-3 mt-2"
+                        variant="neutral"
+                        size="sm"
+                        onClick={() => {
+                            setSelectedDate(undefined)
+                            setMealFilter("all")
+                            setMessFilter("all")
+                        }}
                     >
                         Reset Filters
                     </Button>
@@ -569,7 +626,7 @@ export default function ListingsPage() {
                     <p>Loading listings...</p>
                 </div>
             ) : filteredListings.length > 0 ? (
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-6">
                     {filteredListings.map((listing) => (
                         <Card
                             key={listing.id}
@@ -639,6 +696,92 @@ export default function ListingsPage() {
                 onClose={() => setShowAuthForm(false)}
                 requireApiKey={true}
             />
+
+            {/* Dialog with create listing form */}
+            <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+                <DialogContent>
+                    <DialogHeader>
+                        <DialogTitle>Create New Listing</DialogTitle>
+                        <DialogDescription>
+                            Create a new listing to sell your mess meal.
+                        </DialogDescription>
+                    </DialogHeader>
+
+                    <form onSubmit={handleCreateListing}>
+                        <div className="space-y-4 py-2">
+                            <div>
+                                <label htmlFor="min_price" className="text-sm font-medium block mb-1">
+                                    Minimum Price (₹)
+                                </label>
+                                <Input
+                                    id="min_price"
+                                    name="min_price"
+                                    type="number"
+                                    min="0"
+                                    value={newListing.min_price || ""}
+                                    onChange={handleInputChange}
+                                    required
+                                />
+                            </div>
+
+                            <div>
+                                <label htmlFor="meal" className="text-sm font-medium block mb-1">
+                                    Meal
+                                </label>
+                                <Select
+                                    value={newListing.meal}
+                                    onValueChange={(value) => {
+                                        setNewListing({
+                                            ...newListing,
+                                            meal: value
+                                        });
+                                    }}
+                                    name="meal"
+                                >
+                                    <SelectTrigger>
+                                        <SelectValue placeholder="Select a meal" />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        {mealTypes.map((meal) => (
+                                            <SelectItem key={meal} value={meal}>{meal}</SelectItem>
+                                        ))}
+                                    </SelectContent>
+                                </Select>
+                            </div>
+
+                            <div>
+                                <label htmlFor="date" className="text-sm font-medium block mb-1">
+                                    Date
+                                </label>
+                                <Input
+                                    id="date"
+                                    name="date"
+                                    type="date"
+                                    value={newListing.date}
+                                    onChange={handleInputChange}
+                                    required
+                                />
+                            </div>
+
+                            {isMessLoading && (
+                                <p className="text-center text-sm text-muted-foreground">
+                                    Checking your mess registration...
+                                </p>
+                            )}
+
+                            <p className="text-sm text-muted-foreground text-center">
+                                Your registered mess will be automatically determined
+                            </p>
+                        </div>
+
+                        <DialogFooter className="mt-4">
+                            <Button type="submit" disabled={isMessLoading}>
+                                Create Listing
+                            </Button>
+                        </DialogFooter>
+                    </form>
+                </DialogContent>
+            </Dialog>
         </div>
     )
 }

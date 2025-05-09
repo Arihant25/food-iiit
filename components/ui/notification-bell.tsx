@@ -94,33 +94,37 @@ export default function NotificationBell() {
     const markAsRead = async (id?: string) => {
         if (!session?.user?.rollNumber) return
 
-        let query = supabase
-            .from('notifications')
-            .update({ read: true })
-            .eq('user_id', session.user.rollNumber)
+        try {
+            // Instead of updating, we'll delete the notifications
+            let query = supabase
+                .from('notifications')
+                .delete()
+                .eq('user_id', session.user.rollNumber)
 
-        if (id) {
-            // Mark specific notification as read
-            query = query.eq('id', id)
-        }
+            if (id) {
+                // Delete specific notification
+                query = query.eq('id', id)
+            }
 
-        const { error } = await query
+            const { error } = await query
 
-        if (error) {
-            console.error('Error marking notification as read:', error)
-            return
-        }
+            if (error) {
+                console.error('Error deleting notifications:', error)
+                return
+            }
 
-        // Update local state
-        if (id) {
-            setNotifications(prev =>
-                prev.map(n => (n.id === id ? { ...n, read: true } : n))
-            )
-            setUnreadCount(prev => Math.max(0, prev - 1))
-        } else {
-            // Mark all as read
-            setNotifications(prev => prev.map(n => ({ ...n, read: true })))
-            setUnreadCount(0)
+            // Update local state
+            if (id) {
+                // Remove the notification from state
+                setNotifications(prev => prev.filter(n => n.id !== id))
+                setUnreadCount(prev => Math.max(0, prev - 1))
+            } else {
+                // Remove all notifications
+                setNotifications([])
+                setUnreadCount(0)
+            }
+        } catch (error) {
+            console.error('Error during notification deletion:', error)
         }
     }
 

@@ -76,8 +76,84 @@ export default function DashboardPage() {
             fetchUserListings()
             fetchUserBids()
             fetchTransactionHistory()
+            setupRealTimeSubscriptions()
+        }
+
+        return () => {
+            // Clean up subscriptions on unmount
+            supabase.removeAllChannels()
         }
     }, [status, session])
+
+    // Set up real-time subscriptions
+    const setupRealTimeSubscriptions = () => {
+        if (!session?.user?.rollNumber) return
+
+        // Subscribe to all bids on user's listings
+        const bidsChannel = supabase
+            .channel('dashboard-bids')
+            .on(
+                'postgres_changes',
+                {
+                    event: '*',
+                    schema: 'public',
+                    table: 'bids',
+                },
+                (payload) => {
+                    console.log('Bids change received:', payload)
+                    // Fetch user bids and listings to ensure data is up-to-date
+                    fetchUserBids()
+                    fetchUserListings()
+                }
+            )
+            .subscribe()
+
+        // Subscribe to new listings
+        const listingsChannel = supabase
+            .channel('dashboard-listings')
+            .on(
+                'postgres_changes',
+                {
+                    event: '*',
+                    schema: 'public',
+                    table: 'listings',
+                },
+                (payload) => {
+                    console.log('Listings change received:', payload)
+                    fetchUserListings()
+                }
+            )
+            .subscribe()
+
+        // Subscribe to transactions
+        const transactionsChannel = supabase
+            .channel('dashboard-transactions')
+            .on(
+                'postgres_changes',
+                {
+                    event: '*',
+                    schema: 'public',
+                    table: 'transaction_history',
+                },
+                (payload) => {
+                    console.log('Transaction change received:', payload)
+                    fetchTransactionHistory()
+                    fetchUserListings()
+                    fetchUserBids()
+                }
+            )
+            .subscribe()
+    }
+
+    // Helper function to get listing IDs for subscription filter
+    const getListingIdsFilter = () => {
+        if (!soldListings || soldListings.length === 0) {
+            // Return a dummy ID that won't match any real records 
+            // to avoid query errors when no listings exist
+            return '00000000-0000-0000-0000-000000000000'
+        }
+        return soldListings.map(listing => `"${listing.id}"`).join(',')
+    }
 
     // Fetch both listings sold by user and bought by user
     const fetchUserListings = async () => {
@@ -383,14 +459,16 @@ export default function DashboardPage() {
             <PageHeading title="My Dashboard" />
 
             <Tabs defaultValue="sold" className="w-full" onValueChange={setActiveTab}>
-                <TabsList className="grid w-full grid-cols-4 mb-8">
+                <TabsList className="grid w-full grid-cols-2 md:grid-cols-4 mb-4 md:mb-8 overflow-x-auto">
                     <TabsTrigger value="sold" className="flex items-center justify-center">
                         <ReceiptText className="h-4 w-4 mr-2" />
-                        <span>My Listings</span>
+                        <span className="hidden sm:inline">My Listings</span>
+                        <span className="sm:hidden">Listings</span>
                     </TabsTrigger>
                     <TabsTrigger value="purchased" className="flex items-center justify-center">
                         <ShoppingBag className="h-4 w-4 mr-2" />
-                        <span>Purchases</span>
+                        <span className="hidden sm:inline">Purchases</span>
+                        <span className="sm:hidden">Bought</span>
                     </TabsTrigger>
                     <TabsTrigger value="bids" className="flex items-center justify-center">
                         <TagIcon className="h-4 w-4 mr-2" />
@@ -398,7 +476,8 @@ export default function DashboardPage() {
                     </TabsTrigger>
                     <TabsTrigger value="history" className="flex items-center justify-center">
                         <CalendarDays className="h-4 w-4 mr-2" />
-                        <span>History</span>
+                        <span className="hidden sm:inline">History</span>
+                        <span className="sm:hidden">Log</span>
                     </TabsTrigger>
                 </TabsList>
 
@@ -408,7 +487,7 @@ export default function DashboardPage() {
                             <p>Loading your listings...</p>
                         </div>
                     ) : soldListings.length > 0 ? (
-                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-6">
                             {soldListings.map((listing) => (
                                 <Card
                                     key={listing.id}
@@ -447,6 +526,32 @@ export default function DashboardPage() {
                                             </div>
                                         </div>
 
+                                        {listing.bids && listing.bids.length > 0 && (
+                                            <div className="mt-3 mb-3">
+                                                <h4 className="text-sm font-semibold mb-2">Top bids:</h4>
+                                                <div className="space-y-2 max-h-32 overflow-y-auto">
+                                                    {listing.bids.slice(0, 3).map((bid) => (
+                                                        <div key={bid.id} className="flex justify-between items-center p-2 bg-muted/30 rounded-md">
+                                                            <span className="text-sm">{bid.buyer_name}</span>
+                                                            <div className="flex items-center gap-2">
+                                                                <span className="font-medium">{formatPrice(bid.bid_price)}</span>
+                                                                <Button
+                                                                    variant="default"
+                                                                    size="sm"
+                                                                    onClick={(e) => {
+                                                                        e.stopPropagation();
+                                                                        acceptBid(listing.id, bid.id, bid.bid_price, bid.buyer_roll_number);
+                                                                    }}
+                                                                >
+                                                                    Accept
+                                                                </Button>
+                                                            </div>
+                                                        </div>
+                                                    ))}
+                                                </div>
+                                            </div>
+                                        )}
+
                                         <div className="flex justify-between items-center mt-3 pt-3 border-t border-border/30">
                                             <p className="text-xs text-muted-foreground">
                                                 Posted {formatRelativeTime(listing.created_at)}
@@ -464,7 +569,7 @@ export default function DashboardPage() {
                     ) : (
                         <div className="flex flex-col items-center justify-center h-64 text-center">
                             <p className="mb-4">You haven't listed any meals yet.</p>
-                            <Button onClick={() => window.location.href = "/mess/listings"}>
+                            <Button onClick={() => router.push("/mess/listings")}>
                                 Create your first listing
                             </Button>
                         </div>
@@ -477,7 +582,7 @@ export default function DashboardPage() {
                             <p>Loading your purchases...</p>
                         </div>
                     ) : purchasedListings.length > 0 ? (
-                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-6">
                             {purchasedListings.map((listing) => (
                                 <Card
                                     key={listing.id}
@@ -526,7 +631,7 @@ export default function DashboardPage() {
                     ) : (
                         <div className="flex flex-col items-center justify-center h-64 text-center">
                             <p className="mb-4">You haven't purchased any meal listings yet.</p>
-                            <Button onClick={() => window.location.href = "/mess/listings"}>
+                            <Button onClick={() => router.push("/mess/listings")}>
                                 Browse available listings
                             </Button>
                         </div>
@@ -539,7 +644,7 @@ export default function DashboardPage() {
                             <p>Loading your bids...</p>
                         </div>
                     ) : myBids.length > 0 ? (
-                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-6">
                             {myBids.map((bid) => (
                                 <Card
                                     key={bid.id}
@@ -556,23 +661,23 @@ export default function DashboardPage() {
 
                                         <div className="flex items-start mb-3 mt-6">
                                             <div className="flex items-center gap-2">
-                                                <MessIcon messName={bid.listing.mess} />
+                                                <MessIcon messName={bid.listing?.mess} />
                                                 <div>
-                                                    <h3 className="text-xl font-bold">{bid.listing.mess}</h3>
-                                                    <p className="text-lg">{bid.listing.meal}</p>
+                                                    <h3 className="text-xl font-bold">{bid.listing?.mess}</h3>
+                                                    <p className="text-lg">{bid.listing?.meal}</p>
                                                 </div>
                                             </div>
                                         </div>
 
                                         <div className="flex items-center gap-2 text-muted-foreground mb-2">
                                             <CalendarDays className="h-4 w-4" />
-                                            <p>{formatDate(bid.listing.date)}</p>
+                                            <p>{formatDate(bid.listing?.date)}</p>
                                         </div>
 
                                         <div className="flex flex-col gap-1 text-muted-foreground mb-3">
                                             <div className="flex items-center gap-1">
                                                 <TagIcon className="h-4 w-4" />
-                                                <p>Listing price: {formatPrice(bid.listing.min_price)}</p>
+                                                <p>Listing price: {formatPrice(bid.listing?.min_price)}</p>
                                             </div>
                                             <div className="flex items-center gap-1">
                                                 <TagIcon className="h-4 w-4 text-transparent" />
@@ -611,7 +716,7 @@ export default function DashboardPage() {
                     ) : (
                         <div className="flex flex-col items-center justify-center h-64 text-center">
                             <p className="mb-4">You haven't placed any bids yet.</p>
-                            <Button onClick={() => window.location.href = "/mess/listings"}>
+                            <Button onClick={() => router.push("/mess/listings")}>
                                 Browse available listings
                             </Button>
                         </div>
@@ -624,8 +729,8 @@ export default function DashboardPage() {
                             <p>Loading transaction history...</p>
                         </div>
                     ) : transactions.length > 0 ? (
-                        <div className="overflow-x-auto rounded-md border">
-                            <Table>
+                        <div className="overflow-auto w-full rounded-md border">
+                            <Table className="min-w-full">
                                 <TableHeader className="bg-muted/50">
                                     <TableRow>
                                         <TableHead className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
@@ -634,10 +739,10 @@ export default function DashboardPage() {
                                         <TableHead className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
                                             Meal
                                         </TableHead>
-                                        <TableHead className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
+                                        <TableHead className="text-xs font-medium text-muted-foreground uppercase tracking-wider hidden md:table-cell">
                                             Mess
                                         </TableHead>
-                                        <TableHead className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
+                                        <TableHead className="text-xs font-medium text-muted-foreground uppercase tracking-wider hidden lg:table-cell">
                                             Listed Price
                                         </TableHead>
                                         <TableHead className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
@@ -646,10 +751,10 @@ export default function DashboardPage() {
                                         <TableHead className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
                                             Role
                                         </TableHead>
-                                        <TableHead className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
+                                        <TableHead className="text-xs font-medium text-muted-foreground uppercase tracking-wider hidden sm:table-cell">
                                             Other Party
                                         </TableHead>
-                                        <TableHead className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
+                                        <TableHead className="text-xs font-medium text-muted-foreground uppercase tracking-wider hidden xl:table-cell">
                                             Time to Sale
                                         </TableHead>
                                     </TableRow>
@@ -658,17 +763,17 @@ export default function DashboardPage() {
                                     {transactions.map((tx) => {
                                         const isUserBuyer = tx.buyer_id === session?.user?.rollNumber;
                                         return (
-                                            <TableRow key={tx.id}>
+                                            <TableRow key={tx.id} className="hover:bg-muted/50 cursor-pointer" onClick={() => router.push(`/mess/listings/transaction/${tx.id}`)}>
                                                 <TableCell className="whitespace-nowrap text-sm">
                                                     {formatDate(tx.date_of_transaction)}
                                                 </TableCell>
                                                 <TableCell className="whitespace-nowrap text-sm">
                                                     {tx.meal}
                                                 </TableCell>
-                                                <TableCell className="whitespace-nowrap text-sm">
+                                                <TableCell className="whitespace-nowrap text-sm hidden md:table-cell">
                                                     {tx.mess}
                                                 </TableCell>
-                                                <TableCell className="whitespace-nowrap text-sm">
+                                                <TableCell className="whitespace-nowrap text-sm hidden lg:table-cell">
                                                     {formatPrice(tx.listing_price)}
                                                 </TableCell>
                                                 <TableCell className="whitespace-nowrap text-sm font-medium">
@@ -679,10 +784,10 @@ export default function DashboardPage() {
                                                         {isUserBuyer ? "Buyer" : "Seller"}
                                                     </span>
                                                 </TableCell>
-                                                <TableCell className="whitespace-nowrap text-sm">
+                                                <TableCell className="whitespace-nowrap text-sm hidden sm:table-cell">
                                                     {isUserBuyer ? tx.seller_name : tx.buyer_name}
                                                 </TableCell>
-                                                <TableCell className="whitespace-nowrap text-sm text-muted-foreground">
+                                                <TableCell className="whitespace-nowrap text-sm text-muted-foreground hidden xl:table-cell">
                                                     {tx.time_gap}
                                                 </TableCell>
                                             </TableRow>

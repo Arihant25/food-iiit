@@ -65,6 +65,56 @@ export default function ListingDetailPage() {
         if (id) {
             fetchListing()
             fetchBids()
+
+            // Set up real-time subscriptions for the current listing
+            const listingChannel = supabase
+                .channel(`listing-${id}`)
+                .on('postgres_changes',
+                    {
+                        event: '*',
+                        schema: 'public',
+                        table: 'listings',
+                        filter: `id=eq.${id}`
+                    },
+                    (payload) => {
+                        console.log('Listing change received:', payload)
+                        fetchListing()
+                    }
+                )
+                .subscribe()
+
+            const bidsChannel = supabase
+                .channel(`bids-${id}`)
+                .on('postgres_changes',
+                    {
+                        event: '*',
+                        schema: 'public',
+                        table: 'bids',
+                        filter: `listing_id=eq.${id}`
+                    },
+                    (payload) => {
+                        console.log('Bids change received:', payload)
+
+                        // Smart handling of bid changes
+                        if (payload.eventType === 'INSERT') {
+                            // For new bids, just fetch the new bid information
+                            fetchBidWithUser(payload.new.id)
+                        } else if (payload.eventType === 'UPDATE') {
+                            // For bid updates, update the specific bid
+                            fetchBidWithUser(payload.new.id)
+                        } else {
+                            // For deletions or other changes, refresh all bids
+                            fetchBids()
+                        }
+                    }
+                )
+                .subscribe()
+
+            // Clean up subscriptions on unmount
+            return () => {
+                supabase.removeChannel(listingChannel)
+                supabase.removeChannel(bidsChannel)
+            }
         }
     }, [id])
 
@@ -159,6 +209,72 @@ export default function ListingDetailPage() {
         } catch (error) {
             console.error("Error fetching bids:", error)
             toast.error("Failed to load bids")
+        }
+    }
+
+    // Helper function to fetch a single bid with user information
+    const fetchBidWithUser = async (bidId: string) => {
+        try {
+            // Get the specific bid
+            const { data: bidData, error: bidError } = await supabase
+                .from("bids")
+                .select('*')
+                .eq('id', bidId)
+                .single()
+
+            if (bidError) {
+                console.error("Error fetching specific bid:", bidError)
+                return
+            }
+
+            // Get the buyer information
+            const { data: buyerData, error: buyerError } = await supabase
+                .from("users")
+                .select(`
+                    roll_number,
+                    name,
+                    email,
+                    phone_number
+                `)
+                .eq("roll_number", bidData.buyer_roll_number)
+                .single()
+
+            if (buyerError) {
+                console.error("Error fetching buyer info:", buyerError)
+                return
+            }
+
+            // Create the combined bid object
+            const formattedBid = {
+                ...bidData,
+                buyer: buyerData
+            }
+
+            // Update the bids array
+            setBids(prevBids => {
+                // Check if this bid already exists in our array
+                const existingBidIndex = prevBids.findIndex(b => b.id === bidId)
+
+                if (existingBidIndex >= 0) {
+                    // Replace the existing bid
+                    const newBids = [...prevBids]
+                    newBids[existingBidIndex] = formattedBid as unknown as Bid
+                    return newBids
+                } else {
+                    // Add the new bid
+                    return [...prevBids, formattedBid as unknown as Bid]
+                        .sort((a, b) => b.bid_price - a.bid_price) // Sort by bid price descending
+                }
+            })
+
+            // Also check if this is the current user's bid
+            if (session?.user?.rollNumber && bidData.buyer_roll_number === session.user.rollNumber) {
+                setUserHasBid(true)
+                setUserBidAmount(bidData.bid_price)
+                setBidAmount(bidData.bid_price.toString())
+            }
+        } catch (error) {
+            console.error("Error processing bid update:", error)
         }
     }
 
@@ -461,20 +577,170 @@ export default function ListingDetailPage() {
         return format(date, "do MMMM (EEE)")
     }
 
-    if (loading) {
-        return (
-            <div className="container mx-auto px-4 py-8">
+    return (
+        <div className="container mx-auto px-4 py-6">
+            <div className="flex items-center gap-2 mb-6">
+                <Button
+                    variant="neutral"
+                    size="sm"
+                    onClick={() => router.back()}
+                    className="flex items-center"
+                >
+                    <ArrowLeft className="h-4 w-4 mr-1" />
+                    Back
+                </Button>
+            </div>
+
+            <PageHeading title="Listing Details" />
+
+            {loading ? (
                 <div className="flex justify-center items-center h-64">
                     <p>Loading listing details...</p>
                 </div>
-            </div>
-        )
-    }
+            ) : listing ? (
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                    {/* Main listing details card */}
+                    <Card className="md:col-span-2">
+                        <CardHeader className="flex flex-row items-start justify-between p-6">
+                            <div className="flex items-center gap-3">
+                                <MessIcon messName={listing.mess} size={32} />
+                                <div>
+                                    <h2 className="text-xl font-bold">{listing.mess}</h2>
+                                    <p className="text-sm text-muted-foreground">
+                                        Posted {format(new Date(listing.created_at), 'PPp')}
+                                    </p>
+                                </div>
+                            </div>
+                            <span className="text-2xl font-bold">
+                                ₹{listing.min_price}
+                            </span>
+                        </CardHeader>
 
-    if (!listing) {
-        return (
-            <div className="container mx-auto px-4 py-8">
-                <PageHeading title="Listing Not Found" />
+                        <CardContent className="p-6">
+                            <div className="space-y-4">
+                                <div className="flex items-center gap-2">
+                                    <Clock className="h-5 w-5 text-muted-foreground flex-shrink-0" />
+                                    <span className="text-xl">{listing.meal}</span>
+                                </div>
+
+                                <div className="flex items-center gap-2">
+                                    <CalendarDays className="h-5 w-5 text-muted-foreground flex-shrink-0" />
+                                    <span className="text-xl">{formatDate(listing.date)}</span>
+                                </div>
+
+                                <div className="border-t pt-4 mt-4">
+                                    <h3 className="text-lg font-medium mb-2">Seller Information</h3>
+                                    <div className="flex items-center gap-2 mb-2">
+                                        <User className="h-4 w-4 text-muted-foreground flex-shrink-0" />
+                                        <span>{listing.seller.name}</span>
+                                    </div>
+
+                                    {session?.user && listing.seller.phone_number && (
+                                        <div className="flex items-center gap-2">
+                                            <Phone className="h-4 w-4 text-muted-foreground flex-shrink-0" />
+                                            <span>{listing.seller.phone_number}</span>
+                                        </div>
+                                    )}
+                                </div>
+
+                                {session?.user && session.user.rollNumber !== listing.seller_id && (
+                                    <div className="border-t pt-4 mt-4">
+                                        <h3 className="text-lg font-medium mb-2">Place a Bid</h3>
+                                        <div className="flex items-center gap-2">
+                                            <Input
+                                                type="number"
+                                                min={listing.min_price}
+                                                value={bidAmount}
+                                                onChange={(e) => setBidAmount(e.target.value)}
+                                                placeholder={`Minimum ₹${listing.min_price}`}
+                                                className="w-full"
+                                            />
+                                            <Button
+                                                onClick={handleBid}
+                                                disabled={!bidAmount || isSubmitting || parseFloat(bidAmount) < listing.min_price}
+                                            >
+                                                Bid
+                                            </Button>
+                                        </div>
+                                        <p className="text-sm text-muted-foreground mt-2">
+                                            Enter an amount greater than or equal to the minimum price.
+                                        </p>
+                                    </div>
+                                )}
+
+                                {session?.user?.rollNumber === listing.seller_id && (
+                                    <div className="bg-secondary-background/30 p-4 rounded-md mt-4">
+                                        <p className="text-center text-muted-foreground">
+                                            This is your own listing.
+                                        </p>
+                                    </div>
+                                )}
+
+                                {!session?.user && (
+                                    <div className="border-t pt-4 mt-4">
+                                        <p className="text-center text-muted-foreground">
+                                            Please sign in to contact the seller or place a bid.
+                                        </p>
+                                    </div>
+                                )}
+                            </div>
+                        </CardContent>
+
+                        <CardFooter className="bg-main-foreground/5 p-4">
+                            <p className="text-sm text-muted-foreground">
+                                Listed on {new Date(listing.created_at).toLocaleDateString()} at {new Date(listing.created_at).toLocaleTimeString()}
+                            </p>
+                        </CardFooter>
+                    </Card>
+
+                    {/* Display bids section (visible to the seller only) */}
+                    {session?.user?.rollNumber === listing.seller_id && !listing.buyer_id && bids.length > 0 && (
+                        <Card className="md:col-span-1">
+                            <CardHeader className="bg-main-foreground/5">
+                                <CardTitle className="text-xl font-bold">Bids ({bids.length})</CardTitle>
+                            </CardHeader>
+                            <CardContent className="p-0 divide-y">
+                                {bids.map((bid) => (
+                                    <div key={bid.id} className="p-4 flex justify-between items-center">
+                                        <div>
+                                            <p className="font-medium">{bid.buyer?.name}</p>
+                                            <p className="text-xl font-bold">
+                                                {new Intl.NumberFormat('en-IN', {
+                                                    style: 'currency',
+                                                    currency: 'INR',
+                                                    minimumFractionDigits: 0,
+                                                }).format(bid.bid_price)}
+                                            </p>
+                                            <p className="text-xs text-muted-foreground">
+                                                Bid placed on {new Date(bid.created_at).toLocaleDateString()} at {new Date(bid.created_at).toLocaleTimeString()}
+                                            </p>
+                                        </div>
+                                        <div className="flex gap-2">
+                                            {bid.accepted ? (
+                                                <Button
+                                                    onClick={() => markBidAsPaid(bid.id, bid.bid_price, bid.buyer_roll_number)}
+                                                    variant="noShadow"
+                                                    className="bg-emerald-100 border-emerald-800 text-emerald-800"
+                                                    disabled={bid.paid || completingTransaction}
+                                                >
+                                                    {bid.paid ? "Paid" : "Mark as Paid"}
+                                                </Button>
+                                            ) : (
+                                                <Button
+                                                    onClick={() => acceptBid(bid.id, bid.bid_price, bid.buyer_roll_number)}
+                                                    disabled={completingTransaction}
+                                                >
+                                                    Accept Bid
+                                                </Button>
+                                            )}
+                                        </div>
+                                    </div>
+                                ))}
+                            </CardContent>
+                        </Card>
+                    )}
+                </div>
+            ) : (
                 <div className="flex flex-col items-center justify-center h-64">
                     <AlertCircle className="h-16 w-16 text-muted-foreground mb-4" />
                     <p className="mb-4">This listing doesn't exist or has been removed.</p>
@@ -483,163 +749,7 @@ export default function ListingDetailPage() {
                         Back to Listings
                     </Button>
                 </div>
-            </div>
-        )
-    }
-
-    return (
-        <div className="container mx-auto px-4 py-8">
-            <div className="mb-6">
-                <Button
-                    variant="noShadow"
-                    onClick={() => router.push('/mess/listings')}
-                    className="mb-4"
-                >
-                    <ArrowLeft className="mr-2 h-4 w-4" />
-                    Back to Listings
-                </Button>
-
-                <PageHeading title={`${listing.mess} ${listing.meal}`} />
-            </div>
-
-            <div className="max-w-2xl mx-auto">
-                <Card className="mb-8 overflow-hidden">
-                    <CardHeader className="bg-main-foreground/5">
-                        <div className="flex items-center justify-between">
-                            <div className="flex items-center gap-2">
-                                <MessIcon messName={listing.mess} size={24} />
-                                <CardTitle className="text-3xl font-bold">{listing.mess}</CardTitle>
-                            </div>
-                            <span className="text-2xl font-bold">
-                                ₹{listing.min_price}
-                            </span>
-                        </div>
-                    </CardHeader>
-
-                    <CardContent className="p-6">
-                        <div className="space-y-4">
-                            <div className="flex items-center gap-2">
-                                <Clock className="h-5 w-5 text-muted-foreground" />
-                                <span className="text-xl">{listing.meal}</span>
-                            </div>
-
-                            <div className="flex items-center gap-2">
-                                <CalendarDays className="h-5 w-5 text-muted-foreground" />
-                                <span className="text-xl">{formatDate(listing.date)}</span>
-                            </div>
-
-                            <div className="border-t pt-4 mt-4">
-                                <h3 className="text-lg font-medium mb-2">Seller Information</h3>
-                                <div className="flex items-center gap-2 mb-2">
-                                    <User className="h-4 w-4 text-muted-foreground" />
-                                    <span>{listing.seller.name}</span>
-                                </div>
-
-                                {session?.user && listing.seller.phone_number && (
-                                    <div className="flex items-center gap-2">
-                                        <Phone className="h-4 w-4 text-muted-foreground" />
-                                        <span>{listing.seller.phone_number}</span>
-                                    </div>
-                                )}
-                            </div>
-
-                            {session?.user && session.user.rollNumber !== listing.seller_id && (
-                                <div className="border-t pt-4 mt-4">
-                                    <h3 className="text-lg font-medium mb-2">Place a Bid</h3>
-                                    <div className="flex items-center gap-2">
-                                        <Input
-                                            type="number"
-                                            min={listing.min_price}
-                                            value={bidAmount}
-                                            onChange={(e) => setBidAmount(e.target.value)}
-                                            placeholder={`Minimum ₹${listing.min_price}`}
-                                            className="w-full"
-                                        />
-                                        <Button
-                                            onClick={handleBid}
-                                            disabled={!bidAmount || isSubmitting || parseFloat(bidAmount) < listing.min_price}
-                                        >
-                                            Bid
-                                        </Button>
-                                    </div>
-                                    <p className="text-sm text-muted-foreground mt-2">
-                                        Enter an amount greater than or equal to the minimum price.
-                                    </p>
-                                </div>
-                            )}
-
-                            {session?.user?.rollNumber === listing.seller_id && (
-                                <div className="bg-secondary-background/30 p-4 rounded-md mt-4">
-                                    <p className="text-center text-muted-foreground">
-                                        This is your own listing.
-                                    </p>
-                                </div>
-                            )}
-
-                            {!session?.user && (
-                                <div className="border-t pt-4 mt-4">
-                                    <p className="text-center text-muted-foreground">
-                                        Please sign in to contact the seller or place a bid.
-                                    </p>
-                                </div>
-                            )}
-                        </div>
-                    </CardContent>
-
-                    <CardFooter className="bg-main-foreground/5 p-4">
-                        <p className="text-sm text-muted-foreground">
-                            Listed on {new Date(listing.created_at).toLocaleDateString()} at {new Date(listing.created_at).toLocaleTimeString()}
-                        </p>
-                    </CardFooter>
-                </Card>
-
-                {/* Display bids section (visible to the seller only) */}
-                {session?.user?.rollNumber === listing.seller_id && !listing.buyer_id && bids.length > 0 && (
-                    <Card className="mb-8 overflow-hidden">
-                        <CardHeader className="bg-main-foreground/5">
-                            <CardTitle className="text-xl font-bold">Bids ({bids.length})</CardTitle>
-                        </CardHeader>
-                        <CardContent className="p-0 divide-y">
-                            {bids.map((bid) => (
-                                <div key={bid.id} className="p-4 flex justify-between items-center">
-                                    <div>
-                                        <p className="font-medium">{bid.buyer?.name}</p>
-                                        <p className="text-xl font-bold">
-                                            {new Intl.NumberFormat('en-IN', {
-                                                style: 'currency',
-                                                currency: 'INR',
-                                                minimumFractionDigits: 0,
-                                            }).format(bid.bid_price)}
-                                        </p>
-                                        <p className="text-xs text-muted-foreground">
-                                            Bid placed on {new Date(bid.created_at).toLocaleDateString()} at {new Date(bid.created_at).toLocaleTimeString()}
-                                        </p>
-                                    </div>
-                                    <div className="flex gap-2">
-                                        {bid.accepted ? (
-                                            <Button
-                                                onClick={() => markBidAsPaid(bid.id, bid.bid_price, bid.buyer_roll_number)}
-                                                variant="noShadow"
-                                                className="bg-emerald-100 border-emerald-800 text-emerald-800"
-                                                disabled={bid.paid || completingTransaction}
-                                            >
-                                                {bid.paid ? "Paid" : "Mark as Paid"}
-                                            </Button>
-                                        ) : (
-                                            <Button
-                                                onClick={() => acceptBid(bid.id, bid.bid_price, bid.buyer_roll_number)}
-                                                disabled={completingTransaction}
-                                            >
-                                                Accept Bid
-                                            </Button>
-                                        )}
-                                    </div>
-                                </div>
-                            ))}
-                        </CardContent>
-                    </Card>
-                )}
-            </div>
+            )}
 
             {/* Auth form for users without phone/API key */}
             <UserAuthForm
