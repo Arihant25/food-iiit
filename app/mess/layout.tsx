@@ -62,7 +62,7 @@ export default function MessLayout({
 
     return (
         <div className="relative p-6 ">
-            <div className="mx-9 ml-18 mb-20">
+            <div className="mx-2 ml-13 mb-20">
                 {children}
 
                 <SwitchButton />

@@ -128,23 +128,23 @@ export default function ProfilePage() {
     }
 
     return (
-        <div className="container mx-auto px-4 py-8">
+        <div className="container mx-auto px-2 sm:px-2 py-8">
             <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-8">
-            <PageHeading title="My Profile" />
-            {profile && (
-                <div className="flex justify-end">
-                {!editing ? (
-                    <Button onClick={() => setEditing(true)} size="sm">
-                    <Pencil className="h-4 w-4 mr-2" />
-                    Edit Profile
-                    </Button>
-                ) : (
-                    <Button onClick={() => setEditing(false)} size="sm" variant="noShadow">
-                    Cancel
-                    </Button>
+                <PageHeading title="My Profile" />
+                {profile && (
+                    <div className="flex justify-end">
+                        {!editing ? (
+                            <Button onClick={() => setEditing(true)} size="sm">
+                                <Pencil className="h-4 w-4 mr-2" />
+                                Edit Profile
+                            </Button>
+                        ) : (
+                            <Button onClick={() => setEditing(false)} size="sm" variant="noShadow">
+                                Cancel
+                            </Button>
+                        )}
+                    </div>
                 )}
-                </div>
-            )}
             </div>
 
             {profile ? (
@@ -236,7 +236,7 @@ export default function ProfilePage() {
                                     </div>
                                     <div className="flex items-center">
                                         <Clock className="h-5 w-5 mr-2 text-primary" />
-                                        <p className="break-words">Last active {formatRelativeTime(profile.last_signed_in)}</p>
+                                        <p className="break-words">Last signed in {formatRelativeTime(profile.last_signed_in)}</p>
                                     </div>
                                 </div>
                             </CardContent>

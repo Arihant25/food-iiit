@@ -28,7 +28,7 @@ const formSchema = z.object({
     phone_number: z.string().min(10, {
         message: "Phone number must be at least 10 digits.",
     }),
-    api_key: z.string().optional(), // Make API key optional
+    api_key: z.string().optional(), // API key is conditionally validated in the form
 })
 
 type FormValues = z.infer<typeof formSchema>
@@ -59,7 +59,17 @@ export default function UserAuthForm({ isOpen, onClose, requireApiKey = false }:
             phone_number: "",
             api_key: "",
         },
+        context: { requireApiKey }, // Pass requireApiKey as context
     })
+
+    // Add validation rules for requireApiKey
+    useEffect(() => {
+        if (requireApiKey && missingFields.api_key) {
+            form.register("api_key", {
+                required: "API Key is required for creating listings"
+            });
+        }
+    }, [requireApiKey, form, missingFields.api_key]);
 
     // Check the database directly for user information
     useEffect(() => {
@@ -150,8 +160,7 @@ export default function UserAuthForm({ isOpen, onClose, requireApiKey = false }:
                 ...session,
                 user: {
                     ...session.user,
-                    phoneNumber: missingFields.phone_number ? values.phone_number : session.user.phoneNumber,
-                    apiKey: missingFields.api_key && values.api_key ? values.api_key : session.user.apiKey,
+                    // Just update the session without trying to add fields that don't exist
                 }
             })
 
@@ -176,7 +185,10 @@ export default function UserAuthForm({ isOpen, onClose, requireApiKey = false }:
                 <DialogHeader>
                     <DialogTitle className="text-2xl font-bold">We're almost there</DialogTitle>
                     <DialogDescription>
-                        We just need {missingFields.phone_number && missingFields.api_key ? "two things" : "one thing"} from you to help connect buyers and sellers.
+                        {requireApiKey
+                            ? "You need an API key to create meal listings. This connects to your mess account."
+                            : `We just need ${missingFields.phone_number && missingFields.api_key ? "two things" : "one thing"} from you to help connect buyers and sellers.`
+                        }
                     </DialogDescription>
                 </DialogHeader>
 
@@ -197,7 +209,7 @@ export default function UserAuthForm({ isOpen, onClose, requireApiKey = false }:
                                             <AccordionItem value="why-phone-number">
                                                 <AccordionTrigger className="text-sm">Why phone number?</AccordionTrigger>
                                                 <AccordionContent>
-                                                    We only show your number to people you approve to buy your meals. This helps connect buyers and sellers directly.
+                                                    We only show your number to <strong>people you approve</strong> to buy your meals. This helps connect buyers and sellers directly.
                                                 </AccordionContent>
                                             </AccordionItem>
                                         </Accordion>

@@ -187,9 +187,10 @@ export default function ListingsPage() {
             // Handle different response statuses
             if (response.status === 401) {
                 // User needs to authenticate with the mess system
-                setShowAuthForm(true)
-                toast.error("Please update your API key")
-                return null
+                setShowAuthForm(true);
+                setIsDialogOpen(false); // Close the listing creation dialog
+                toast.error("Please update your API key");
+                return null;
             }
 
             if (!response.ok) {
@@ -251,6 +252,23 @@ export default function ListingsPage() {
         try {
             // Set loading state
             setIsMessLoading(true);
+
+            // Check if the user has an API key configured
+            const { data: userData, error: userError } = await supabase
+                .from('users')
+                .select('api_key')
+                .eq('roll_number', session.user.rollNumber)
+                .single();
+
+            if (userError || !userData?.api_key) {
+                console.log("API key not found or error fetching user data");
+                // Show the auth form since API key is null
+                setShowAuthForm(true);
+                setIsDialogOpen(false); // Close the listing creation dialog
+                toast.error("Please set your API key to create a listing");
+                setIsMessLoading(false);
+                return;
+            }
 
             // Fetch the user's mess for the selected date and meal
             const userMess = await fetchUserMess(newListing.date, newListing.meal);
@@ -537,6 +555,7 @@ export default function ListingsPage() {
             <UserAuthForm
                 isOpen={showAuthForm}
                 onClose={() => setShowAuthForm(false)}
+                requireApiKey={true}
             />
         </div>
     )
