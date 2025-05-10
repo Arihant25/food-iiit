@@ -6,7 +6,7 @@ import { useSession } from "next-auth/react"
 import { supabase } from "@/lib/supabaseClient"
 import { toast } from "sonner"
 import { format } from "date-fns"
-import { CalendarDays, Clock, User, Phone, AlertCircle, ArrowLeft, Edit2, AlertTriangle } from "lucide-react"
+import { CalendarDays, Clock, User, Phone, AlertCircle, ArrowLeft, Edit2, AlertTriangle, Share2 } from "lucide-react"
 
 import { PageHeading } from "@/components/ui/page-heading"
 import { MessIcon } from "@/components/ui/mess-icon"
@@ -768,6 +768,19 @@ export default function ListingDetailPage() {
         return format(date, "do MMMM (EEE)")
     }
 
+    const handleShare = async () => {
+        if (!listing) return
+
+        const shareText = `[SELL] ${listing.mess} ${listing.meal}\n${formatDate(listing.date)}\n₹${listing.min_price}`
+
+        // Open WhatsApp directly with the message
+        const whatsappUrl = `https://wa.me/?text=${encodeURIComponent(`${shareText}\n${window.location.href}`)}`
+
+        // Open WhatsApp in a new tab
+        window.open(whatsappUrl, '_blank')
+        toast.success('Opening WhatsApp to share listing')
+    }
+
     return (
         <div className="container mx-auto px-4 py-6">
             <div className="flex items-center gap-2 mb-6">
@@ -897,82 +910,102 @@ export default function ListingDetailPage() {
                                         </p>
                                     </div>
                                 )}
+
+                                {session?.user?.rollNumber === listing.seller_id && (
+                                    <div className="border-t pt-4 mt-4 flex justify-end">
+                                        <Button
+                                            variant="neutral"
+                                            size="sm"
+                                            onClick={handleShare}
+                                            className="flex items-center gap-1"
+                                        >
+                                            <Share2 className="h-4 w-4 mr-1" />
+                                            Share
+                                        </Button>
+                                    </div>
+                                )}
                             </div>
                         </CardContent>
                     </Card>
 
                     {/* Display bids section */}
-                    {!listing.buyer_id && bids.length > 0 && (
+                    {!listing.buyer_id && (
                         <Card className="md:col-span-1">
                             <CardHeader>
                                 <CardTitle className="text-xl font-bold">Bids ({bids.length})</CardTitle>
                             </CardHeader>
-                            <CardContent className="p-0 divide-y">
-                                {bids.map((bid) => (
-                                    <div key={bid.id} className={`p-4 flex justify-between items-center ${bid.accepted ? "bg-emerald-50" : ""}`}>
-                                        <div>
-                                            <p className="font-medium">{bid.buyer?.name}</p>
-                                            <p className="text-xl font-bold">
-                                                {new Intl.NumberFormat('en-IN', {
-                                                    style: 'currency',
-                                                    currency: 'INR',
-                                                    minimumFractionDigits: 0,
-                                                }).format(bid.bid_price)}
-                                            </p>
-                                            <p className="text-xs text-muted-foreground">
-                                                Bid placed on {format(new Date(bid.created_at), 'do MMMM')} at {new Date(bid.created_at).toLocaleTimeString()}
-                                            </p>
-                                            {bid.accepted && (
-                                                <div className="mt-1 flex items-center">
-                                                    <span className="text-xs font-medium text-emerald-700 bg-emerald-100 px-2 py-0.5 rounded-full">
-                                                        Accepted Bid
-                                                    </span>
-                                                </div>
-                                            )}
-                                            {bid.accepted && bid.buyer?.phone_number && session?.user?.rollNumber === listing.seller_id && (
-                                                <div className="flex items-center gap-1 mt-1">
-                                                    <Phone className="h-3 w-3 text-muted-foreground" />
-                                                    <p className="text-xs">{bid.buyer.phone_number}</p>
+                            <CardContent className={`${bids.length > 0 ? "p-0 divide-y" : "p-4"}`}>
+                                {bids.length > 0 ? (
+                                    bids.map((bid) => (
+                                        <div key={bid.id} className={`p-4 flex justify-between items-center ${bid.accepted ? "bg-emerald-50" : ""}`}>
+                                            <div>
+                                                <p className="font-medium">{bid.buyer?.name}</p>
+                                                <p className="text-xl font-bold">
+                                                    {new Intl.NumberFormat('en-IN', {
+                                                        style: 'currency',
+                                                        currency: 'INR',
+                                                        minimumFractionDigits: 0,
+                                                    }).format(bid.bid_price)}
+                                                </p>
+                                                <p className="text-xs text-muted-foreground">
+                                                    Bid placed on {format(new Date(bid.created_at), 'do MMMM')} at {new Date(bid.created_at).toLocaleTimeString()}
+                                                </p>
+                                                {bid.accepted && (
+                                                    <div className="mt-1 flex items-center">
+                                                        <span className="text-xs font-medium text-emerald-700 bg-emerald-100 px-2 py-0.5 rounded-full">
+                                                            Accepted Bid
+                                                        </span>
+                                                    </div>
+                                                )}
+                                                {bid.accepted && bid.buyer?.phone_number && session?.user?.rollNumber === listing.seller_id && (
+                                                    <div className="flex items-center gap-1 mt-1">
+                                                        <Phone className="h-3 w-3 text-muted-foreground" />
+                                                        <p className="text-xs">{bid.buyer.phone_number}</p>
+                                                    </div>
+                                                )}
+                                            </div>
+                                            {session?.user?.rollNumber === listing.seller_id && (
+                                                <div className="flex gap-2">
+                                                    {bid.accepted ? (
+                                                        <>
+                                                            <Button
+                                                                onClick={() => markBidAsPaid(bid.id, bid.bid_price, bid.buyer_roll_number)}
+                                                                variant="noShadow"
+                                                                className="bg-emerald-100 border-emerald-800 text-emerald-800"
+                                                                disabled={bid.paid || completingTransaction}
+                                                            >
+                                                                {bid.paid ? "Paid" : "Mark as Paid"}
+                                                            </Button>
+                                                            <Button
+                                                                onClick={() => {
+                                                                    setBidToUnmark(bid.id);
+                                                                    setShowUnmarkBidConfirmation(true);
+                                                                }}
+                                                                variant="neutral"
+                                                                size="sm"
+                                                                disabled={completingTransaction}
+                                                            >
+                                                                Cancel Bid
+                                                            </Button>
+                                                        </>
+                                                    ) : (
+                                                        <Button
+                                                            onClick={() => acceptBid(bid.id, bid.bid_price, bid.buyer_roll_number)}
+                                                            disabled={completingTransaction || bids.some(b => b.accepted)}
+                                                            title={bids.some(b => b.accepted) ? "Another bid is already accepted" : "Accept this bid"}
+                                                        >
+                                                            {bids.some(b => b.accepted) ? "Another Bid Accepted" : "Accept Bid"}
+                                                        </Button>
+                                                    )}
                                                 </div>
                                             )}
                                         </div>
-                                        {session?.user?.rollNumber === listing.seller_id && (
-                                            <div className="flex gap-2">
-                                                {bid.accepted ? (
-                                                    <>
-                                                        <Button
-                                                            onClick={() => markBidAsPaid(bid.id, bid.bid_price, bid.buyer_roll_number)}
-                                                            variant="noShadow"
-                                                            className="bg-emerald-100 border-emerald-800 text-emerald-800"
-                                                            disabled={bid.paid || completingTransaction}
-                                                        >
-                                                            {bid.paid ? "Paid" : "Mark as Paid"}
-                                                        </Button>
-                                                        <Button
-                                                            onClick={() => {
-                                                                setBidToUnmark(bid.id);
-                                                                setShowUnmarkBidConfirmation(true);
-                                                            }}
-                                                            variant="neutral"
-                                                            size="sm"
-                                                            disabled={completingTransaction}
-                                                        >
-                                                            Cancel Bid
-                                                        </Button>
-                                                    </>
-                                                ) : (
-                                                    <Button
-                                                        onClick={() => acceptBid(bid.id, bid.bid_price, bid.buyer_roll_number)}
-                                                        disabled={completingTransaction || bids.some(b => b.accepted)}
-                                                        title={bids.some(b => b.accepted) ? "Another bid is already accepted" : "Accept this bid"}
-                                                    >
-                                                        {bids.some(b => b.accepted) ? "Another Bid Accepted" : "Accept Bid"}
-                                                    </Button>
-                                                )}
-                                            </div>
-                                        )}
-                                    </div>
-                                ))}
+                                    )))
+                                    : (
+                                        <p className="text-center text-muted-foreground">
+                                            When people start bidding they will show up here.
+                                        </p>
+                                    )}
                             </CardContent>
                         </Card>
                     )}
