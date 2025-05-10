@@ -61,6 +61,12 @@ export const notificationMessages = {
         title: 'Bid Accepted!',
         message: `Your bid of ₹${price} for ${mess} ${meal} has been accepted. Please contact ${sellerName} at ${sellerPhoneNumber} to complete the transaction.`,
     }),
+    
+    // For a seller when they accept a bid
+    bidAcceptedSeller: (price: number, mess: string, meal: string, buyerName: string, buyerPhoneNumber: string) => ({
+        title: 'Bid Accepted',
+        message: `You've accepted ${buyerName}'s bid of ₹${price} for your ${mess} ${meal} listing. You can contact them at ${buyerPhoneNumber}.`,
+    }),
 
     // For a buyer when their bid is marked as paid
     paymentMarked: (price: number, mess: string, meal: string, sellerName: string) => ({

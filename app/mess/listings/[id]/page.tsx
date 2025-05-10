@@ -65,6 +65,8 @@ export default function ListingDetailPage() {
     const [newMinPrice, setNewMinPrice] = useState("")
     const [updatingPrice, setUpdatingPrice] = useState(false)
     const [showLowBidConfirmation, setShowLowBidConfirmation] = useState(false)
+    const [showUnmarkBidConfirmation, setShowUnmarkBidConfirmation] = useState(false)
+    const [bidToUnmark, setBidToUnmark] = useState<string | null>(null)
 
     useEffect(() => {
         if (id) {
@@ -446,7 +448,21 @@ export default function ListingDetailPage() {
 
         try {
             setCompletingTransaction(true)
-            // Mark the bid as accepted
+
+            // Check if any bids are already accepted and unmark them first
+            const acceptedBids = bids.filter(bid => bid.accepted && bid.id !== bidId)
+            if (acceptedBids.length > 0) {
+                for (const acceptedBid of acceptedBids) {
+                    const { error: unmarkerror } = await supabase
+                        .from("bids")
+                        .update({ accepted: false })
+                        .eq("id", acceptedBid.id)
+
+                    if (unmarkerror) throw unmarkerror
+                }
+            }
+
+            // Mark the new bid as accepted
             const { error: bidError } = await supabase
                 .from("bids")
                 .update({ accepted: true })
@@ -461,8 +477,14 @@ export default function ListingDetailPage() {
 
                 const sellerName = listing.seller.name;
                 const sellerPhoneNumber = listing.seller.phone_number || "N/A";
-                const notif = notificationMessages.bidAccepted(bidPrice, listing.mess, listing.meal, sellerName, sellerPhoneNumber)
 
+                // Find the buyer data for the notification
+                const buyerData = bids.find(b => b.id === bidId)?.buyer;
+                const buyerName = buyerData?.name || "Buyer";
+                const buyerPhoneNumber = buyerData?.phone_number || "N/A";
+
+                // Send notification to buyer
+                const notif = notificationMessages.bidAccepted(bidPrice, listing.mess, listing.meal, sellerName, sellerPhoneNumber)
                 await sendNotification(
                     buyerRollNumber,
                     'bid_accepted',
@@ -478,9 +500,33 @@ export default function ListingDetailPage() {
                         meal: listing.meal
                     }
                 )
+
+                // Also send notification to seller with buyer's contact info
+                const sellerNotif = notificationMessages.bidAcceptedSeller(bidPrice, listing.mess, listing.meal, buyerName, buyerPhoneNumber)
+                await sendNotification(
+                    listing.seller_id,
+                    'bid_accepted',
+                    sellerNotif.title,
+                    sellerNotif.message,
+                    {
+                        listingId: id,
+                        bidId: bidId,
+                        sellerId: listing.seller_id,
+                        buyerId: buyerRollNumber,
+                        price: bidPrice,
+                        mess: listing.mess,
+                        meal: listing.meal
+                    }
+                )
+
+                // Show toast with buyer's contact info
+                if (buyerPhoneNumber !== "N/A") {
+                    toast.success(`Bid accepted! Buyer contact: ${buyerPhoneNumber}`)
+                } else {
+                    toast.success("Bid accepted successfully")
+                }
             }
 
-            toast.success("Bid accepted successfully")
             fetchBids() // Refresh the bids list
         } catch (error) {
             console.error("Error accepting bid:", error)
@@ -599,6 +645,87 @@ export default function ListingDetailPage() {
         }
     }
 
+    // Unmark a bid as accepted and delete it (seller only)
+    const unmarkBid = async () => {
+        if (!bidToUnmark) return;
+
+        if (!session?.user || session.user.rollNumber !== listing?.seller_id) {
+            toast.error("Only the seller can manage accepted bids")
+            return
+        }
+
+        if (!listing) {
+            toast.error("Listing information is missing")
+            return
+        }
+
+        try {
+            setCompletingTransaction(true)
+
+            // Get the bid details before deleting it
+            const bidToRemove = bids.find(bid => bid.id === bidToUnmark);
+            if (!bidToRemove) {
+                throw new Error("Bid not found");
+            }
+
+            const buyerRollNumber = bidToRemove.buyer_roll_number;
+            const bidPrice = bidToRemove.bid_price;
+
+            // Delete the bid directly instead of unmarking it
+            const { error: deleteError } = await supabase
+                .from("bids")
+                .delete()
+                .eq("id", bidToUnmark)
+
+            if (deleteError) throw deleteError
+
+            // Send notification to the buyer about the bid cancellation
+            if (typeof window !== 'undefined') {
+                // Import dynamically to avoid server-side issues
+                const { sendNotification, notificationMessages } = await import('@/lib/notifications')
+
+                const sellerName = listing.seller.name;
+
+                // Create a notification for bid cancellation (you may need to add this to your notification messages)
+                const notif = {
+                    title: "Bid Cancelled",
+                    message: `Your bid of ₹${bidPrice} for ${listing.meal} at ${listing.mess} has been cancelled by the seller. You don't need to make payment.`
+                };
+
+                // If you have this in your notification messages, use it instead
+                // const notif = notificationMessages.bidCancelled(bidPrice, listing.mess, listing.meal, sellerName);
+
+                await sendNotification(
+                    buyerRollNumber,
+                    'bid_cancelled',
+                    notif.title,
+                    notif.message,
+                    {
+                        listingId: id,
+                        bidId: bidToUnmark,
+                        sellerId: listing.seller_id,
+                        buyerId: buyerRollNumber,
+                        price: bidPrice,
+                        mess: listing.mess,
+                        meal: listing.meal
+                    }
+                )
+            }
+
+            // Clear the confirmation dialog
+            setShowUnmarkBidConfirmation(false)
+            setBidToUnmark(null)
+
+            toast.success("Bid cancelled and deleted successfully")
+            fetchBids() // Refresh the bids list
+        } catch (error) {
+            console.error("Error deleting bid:", error)
+            toast.error("Failed to cancel and delete bid")
+        } finally {
+            setCompletingTransaction(false)
+        }
+    }
+
     // Update the minimum price (seller only)
     const updateMinPrice = async () => {
         if (!session?.user || session.user.rollNumber !== listing?.seller_id) {
@@ -667,10 +794,10 @@ export default function ListingDetailPage() {
                     <p>Loading listing details...</p>
                 </div>
             ) : listing ? (
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                     {/* Main listing details card */}
-                    <Card className="md:col-span-2">
-                        <CardHeader className="flex flex-row items-start justify-between p-6">
+                    <Card className="md:col-span-1">
+                        <CardHeader className="flex flex-row items-start justify-between">
                             <div className="flex items-center gap-3">
                                 <MessIcon messName={listing.mess} size={32} />
                                 <div>
@@ -728,7 +855,7 @@ export default function ListingDetailPage() {
                             )}
                         </CardHeader>
 
-                        <CardContent className="p-6">
+                        <CardContent className="">
                             <div className="space-y-4">
                                 <div className="flex items-center gap-2">
                                     <Clock className="h-5 w-5 text-muted-foreground flex-shrink-0" />
@@ -740,20 +867,11 @@ export default function ListingDetailPage() {
                                     <span className="text-xl">{formatDate(listing.date)}</span>
                                 </div>
 
-                                <div className="border-t pt-4 mt-4">
-                                    <h3 className="text-lg font-medium mb-2">Seller Information</h3>
-                                    <div className="flex items-center gap-2 mb-2">
-                                        <User className="h-4 w-4 text-muted-foreground flex-shrink-0" />
-                                        <span>{listing.seller.name}</span>
-                                    </div>
-
-                                    {session?.user && listing.seller.phone_number && (
-                                        <div className="flex items-center gap-2">
-                                            <Phone className="h-4 w-4 text-muted-foreground flex-shrink-0" />
-                                            <span>{listing.seller.phone_number}</span>
-                                        </div>
-                                    )}
+                                <div className="flex items-center gap-2 mb-2">
+                                    <User className="h-5 w-5 text-muted-foreground flex-shrink-0" />
+                                    <span>{listing.seller.name}</span>
                                 </div>
+
 
                                 {session?.user && session.user.rollNumber !== listing.seller_id && (
                                     <div className="border-t pt-4 mt-4">
@@ -777,14 +895,6 @@ export default function ListingDetailPage() {
                                     </div>
                                 )}
 
-                                {session?.user?.rollNumber === listing.seller_id && (
-                                    <div className="bg-secondary-background/30 p-4 rounded-md mt-4">
-                                        <p className="text-center text-muted-foreground">
-                                            This is how your listing will appear to others.
-                                        </p>
-                                    </div>
-                                )}
-
                                 {!session?.user && (
                                     <div className="border-t pt-4 mt-4">
                                         <p className="text-center text-muted-foreground">
@@ -794,23 +904,17 @@ export default function ListingDetailPage() {
                                 )}
                             </div>
                         </CardContent>
-
-                        <CardFooter className="bg-main-foreground/5 p-4">
-                            <p className="text-sm text-muted-foreground">
-                                Listed on {new Date(listing.created_at).toLocaleDateString()} at {new Date(listing.created_at).toLocaleTimeString()}
-                            </p>
-                        </CardFooter>
                     </Card>
 
                     {/* Display bids section */}
                     {!listing.buyer_id && bids.length > 0 && (
                         <Card className="md:col-span-1">
-                            <CardHeader className="bg-main-foreground/5">
+                            <CardHeader>
                                 <CardTitle className="text-xl font-bold">Bids ({bids.length})</CardTitle>
                             </CardHeader>
                             <CardContent className="p-0 divide-y">
                                 {bids.map((bid) => (
-                                    <div key={bid.id} className="p-4 flex justify-between items-center">
+                                    <div key={bid.id} className={`p-4 flex justify-between items-center ${bid.accepted ? "bg-emerald-50" : ""}`}>
                                         <div>
                                             <p className="font-medium">{bid.buyer?.name}</p>
                                             <p className="text-xl font-bold">
@@ -821,26 +925,53 @@ export default function ListingDetailPage() {
                                                 }).format(bid.bid_price)}
                                             </p>
                                             <p className="text-xs text-muted-foreground">
-                                                Bid placed on {new Date(bid.created_at).toLocaleDateString()} at {new Date(bid.created_at).toLocaleTimeString()}
+                                                Bid placed on {format(new Date(bid.created_at), 'do MMMM')} at {new Date(bid.created_at).toLocaleTimeString()}
                                             </p>
+                                            {bid.accepted && (
+                                                <div className="mt-1 flex items-center">
+                                                    <span className="text-xs font-medium text-emerald-700 bg-emerald-100 px-2 py-0.5 rounded-full">
+                                                        Accepted Bid
+                                                    </span>
+                                                </div>
+                                            )}
+                                            {bid.accepted && bid.buyer?.phone_number && session?.user?.rollNumber === listing.seller_id && (
+                                                <div className="flex items-center gap-1 mt-1">
+                                                    <Phone className="h-3 w-3 text-muted-foreground" />
+                                                    <p className="text-xs">{bid.buyer.phone_number}</p>
+                                                </div>
+                                            )}
                                         </div>
                                         {session?.user?.rollNumber === listing.seller_id && (
                                             <div className="flex gap-2">
                                                 {bid.accepted ? (
-                                                    <Button
-                                                        onClick={() => markBidAsPaid(bid.id, bid.bid_price, bid.buyer_roll_number)}
-                                                        variant="noShadow"
-                                                        className="bg-emerald-100 border-emerald-800 text-emerald-800"
-                                                        disabled={bid.paid || completingTransaction}
-                                                    >
-                                                        {bid.paid ? "Paid" : "Mark as Paid"}
-                                                    </Button>
+                                                    <>
+                                                        <Button
+                                                            onClick={() => markBidAsPaid(bid.id, bid.bid_price, bid.buyer_roll_number)}
+                                                            variant="noShadow"
+                                                            className="bg-emerald-100 border-emerald-800 text-emerald-800"
+                                                            disabled={bid.paid || completingTransaction}
+                                                        >
+                                                            {bid.paid ? "Paid" : "Mark as Paid"}
+                                                        </Button>
+                                                        <Button
+                                                            onClick={() => {
+                                                                setBidToUnmark(bid.id);
+                                                                setShowUnmarkBidConfirmation(true);
+                                                            }}
+                                                            variant="outline"
+                                                            size="sm"
+                                                            disabled={completingTransaction}
+                                                        >
+                                                            Cancel Bid
+                                                        </Button>
+                                                    </>
                                                 ) : (
                                                     <Button
                                                         onClick={() => acceptBid(bid.id, bid.bid_price, bid.buyer_roll_number)}
-                                                        disabled={completingTransaction}
+                                                        disabled={completingTransaction || bids.some(b => b.accepted)}
+                                                        title={bids.some(b => b.accepted) ? "Another bid is already accepted" : "Accept this bid"}
                                                     >
-                                                        Accept Bid
+                                                        {bids.some(b => b.accepted) ? "Another Bid Accepted" : "Accept Bid"}
                                                     </Button>
                                                 )}
                                             </div>
@@ -897,6 +1028,38 @@ export default function ListingDetailPage() {
                             disabled={isSubmitting}
                         >
                             Yes, Place Bid
+                        </Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
+
+            {/* Confirmation dialog for unmarking an accepted bid */}
+            <Dialog open={showUnmarkBidConfirmation} onOpenChange={setShowUnmarkBidConfirmation}>
+                <DialogContent>
+                    <DialogHeader>
+                        <div className="flex items-center gap-2">
+                            <AlertTriangle className="h-5 w-5 text-yellow-500" />
+                            <DialogTitle>Cancel Accepted Bid</DialogTitle>
+                        </div>
+                        <DialogDescription>
+                            Are you sure you want to cancel this accepted bid? This will delete the bid and notify the buyer that they no longer need to make payment.
+                        </DialogDescription>
+                    </DialogHeader>
+                    <DialogFooter>
+                        <Button
+                            variant="neutral"
+                            onClick={() => {
+                                setShowUnmarkBidConfirmation(false);
+                                setBidToUnmark(null);
+                            }}
+                        >
+                            No, Keep Bid
+                        </Button>
+                        <Button
+                            onClick={unmarkBid}
+                            disabled={completingTransaction}
+                        >
+                            Yes, Cancel Bid
                         </Button>
                     </DialogFooter>
                 </DialogContent>

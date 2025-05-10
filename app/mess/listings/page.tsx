@@ -9,6 +9,7 @@ import { Plus, Filter, Search, CalendarDays, MessageSquare } from "lucide-react"
 import { toast } from "sonner"
 import { useDebounce } from "@/lib/hooks"
 import { formatRelativeTime } from "@/lib/utils"
+import { fetchFilteredListings, getBidCounts } from "./fetch-listings"
 
 import { PageHeading } from "@/components/ui/page-heading"
 import { MessIcon } from "@/components/ui/mess-icon"
@@ -169,8 +170,16 @@ export default function ListingsPage() {
                                 return prevFiltered;
                             });
                         } else {
-                            // For updates or other events, fetch the current count
-                            updateBidCountForListing(listingId)
+                            // For updates, check if this is a bid being accepted or unaccepted
+                            if (payload.new && payload.old &&
+                                payload.new.accepted !== payload.old.accepted) {
+                                // If a bid acceptance status changed, refresh all listings
+                                // This handles both accepting and unaccepting bids
+                                fetchListings();
+                            } else {
+                                // For other updates, just update the bid count
+                                updateBidCountForListing(listingId);
+                            }
                         }
                     }
                 }
@@ -235,20 +244,11 @@ export default function ListingsPage() {
     const fetchListings = async () => {
         try {
             setLoading(true)
-            // First fetch all listings
-            const { data, error } = await supabase
-                .from("listings")
-                .select(`
-                    *,
-                    users:seller_id (
-                        name,
-                        email
-                    )
-                `)
-                .order("created_at", { ascending: false })
+
+            // Use the utility function to get filtered listings (without listings that have accepted bids)
+            const { data, error } = await fetchFilteredListings();
 
             if (error) {
-                console.error("Error fetching listings:", error)
                 toast.error("Failed to load listings")
                 return
             }
@@ -256,25 +256,8 @@ export default function ListingsPage() {
             // Get all listing IDs to fetch their bid counts
             const listingIds = data.map(listing => listing.id)
 
-            // Initialize bid counts for all listings
-            const bidCountMap = new Map<string, number>()
-
-            // If there are listings, fetch their bid counts
-            if (listingIds.length > 0) {
-                // Get the count of bids for each listing
-                const { data: bidCountsData, error: bidCountsError } = await supabase
-                    .from("bids")
-                    .select('listing_id')
-                    .in('listing_id', listingIds)
-
-                if (!bidCountsError && bidCountsData) {
-                    // Count bids per listing
-                    bidCountsData.forEach((bid: { listing_id: string }) => {
-                        const count = bidCountMap.get(bid.listing_id) || 0
-                        bidCountMap.set(bid.listing_id, count + 1)
-                    })
-                }
-            }
+            // Get bid counts for all listings
+            const bidCountMap = await getBidCounts(listingIds);
 
             // Transform the data to include user information and bid count
             const formattedListings = data.map(item => ({
@@ -532,7 +515,7 @@ export default function ListingsPage() {
                 </div>
                 <div className="flex flex-wrap gap-2 w-full sm:w-auto">
                     <Button
-                        variant="outline"
+                        variant="neutral"
                         size="sm"
                         className="flex items-center"
                         onClick={() => setShowFilters(!showFilters)}

@@ -5,7 +5,7 @@ import { useSession } from "next-auth/react"
 import { useRouter } from "next/navigation" // Add router import
 import { supabase } from "@/lib/supabaseClient"
 import { format } from "date-fns"
-import { CalendarDays, ShoppingBag, ReceiptText, TagIcon } from "lucide-react"
+import { CalendarDays, ShoppingBag, ReceiptText, TagIcon, Phone } from "lucide-react"
 import { toast } from "sonner"
 import { formatRelativeTime } from "@/lib/utils"
 
@@ -41,6 +41,7 @@ interface bid {
     accepted: boolean
     paid: boolean
     buyer_name?: string
+    buyer_phone?: string | null
     seller_name?: string
     listing?: any
 }
@@ -180,7 +181,10 @@ export default function DashboardPage() {
                     .from("bids")
                     .select(`
                         *,
-                        buyer:buyer_roll_number (name)
+                        buyer:buyer_roll_number (
+                            name,
+                            phone_number
+                        )
                     `)
                     .eq("listing_id", item.id)
                     .order("bid_price", { ascending: false })
@@ -189,7 +193,8 @@ export default function DashboardPage() {
 
                 const formattedBids = bids ? bids.map(bid => ({
                     ...bid,
-                    buyer_name: bid.buyer ? bid.buyer.name : "Unknown Buyer"
+                    buyer_name: bid.buyer ? bid.buyer.name : "Unknown Buyer",
+                    buyer_phone: bid.buyer ? bid.buyer.phone_number : null
                 })) : []
 
                 return {
@@ -420,7 +425,6 @@ export default function DashboardPage() {
 
     // Format price to INR
     const formatPrice = (price: number | undefined) => {
-        if (!price) return "N/A"
         return new Intl.NumberFormat('en-IN', {
             style: 'currency',
             currency: 'INR',
@@ -540,9 +544,17 @@ export default function DashboardPage() {
                                                 Posted {formatRelativeTime(listing.created_at)}
                                             </p>
                                             {listing.buyer_name && (
-                                                <p className="text-sm font-medium">
-                                                    Buyer: {listing.buyer_name}
-                                                </p>
+                                                <div className="text-sm">
+                                                    <p className="font-medium">Buyer: {listing.buyer_name}</p>
+                                                    {listing.bids && listing.bids.some(bid => bid.accepted && bid.buyer_phone) && (
+                                                        <div className="flex items-center gap-1">
+                                                            <Phone className="h-3 w-3 text-muted-foreground" />
+                                                            <p className="text-xs text-muted-foreground">
+                                                                {listing.bids.find(bid => bid.accepted)?.buyer_phone}
+                                                            </p>
+                                                        </div>
+                                                    )}
+                                                </div>
                                             )}
                                         </div>
                                     </div>

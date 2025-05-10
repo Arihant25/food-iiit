@@ -7,6 +7,7 @@ import {
     ColumnDef,
     ColumnFiltersState,
     SortingState,
+    VisibilityState,
     flexRender,
     getCoreRowModel,
     getFilteredRowModel,
@@ -14,15 +15,19 @@ import {
     getSortedRowModel,
     useReactTable,
 } from "@tanstack/react-table"
-import { ArrowUpDown, ChevronDown } from "lucide-react"
+import { ArrowUpDown, ChevronDown, MoreHorizontal } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
+import { Checkbox } from "@/components/ui/checkbox"
 import { Input } from "@/components/ui/input"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import {
     DropdownMenu,
     DropdownMenuCheckboxItem,
     DropdownMenuContent,
+    DropdownMenuItem,
+    DropdownMenuLabel,
+    DropdownMenuSeparator,
     DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 
@@ -52,6 +57,7 @@ export function TransactionsTable({ data, userRollNumber }: DataTableProps) {
     const [sorting, setSorting] = useState<SortingState>([])
     const [columnFilters, setColumnFilters] = useState<ColumnFiltersState>([])
     const [globalFilter, setGlobalFilter] = useState<string>("")
+    const [columnVisibility, setColumnVisibility] = useState<VisibilityState>({})
 
     // Format date to show "28th May (Tue)"
     const formatDate = (dateString: string) => {
@@ -61,7 +67,6 @@ export function TransactionsTable({ data, userRollNumber }: DataTableProps) {
 
     // Format price to INR
     const formatPrice = (price: number | undefined) => {
-        if (!price) return "N/A"
         return new Intl.NumberFormat('en-IN', {
             style: 'currency',
             currency: 'INR',
@@ -116,6 +121,7 @@ export function TransactionsTable({ data, userRollNumber }: DataTableProps) {
                 return (
                     <Button
                         variant="noShadow"
+                        size="sm"
                         onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
                     >
                         Date
@@ -131,6 +137,7 @@ export function TransactionsTable({ data, userRollNumber }: DataTableProps) {
                 return (
                     <Button
                         variant="noShadow"
+                        size="sm"
                         onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
                     >
                         Meal
@@ -149,6 +156,7 @@ export function TransactionsTable({ data, userRollNumber }: DataTableProps) {
                 return (
                     <Button
                         variant="noShadow"
+                        size="sm"
                         onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
                     >
                         Mess
@@ -166,6 +174,7 @@ export function TransactionsTable({ data, userRollNumber }: DataTableProps) {
                 return (
                     <Button
                         variant="noShadow"
+                        size="sm"
                         onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
                     >
                         Listed Price
@@ -181,6 +190,7 @@ export function TransactionsTable({ data, userRollNumber }: DataTableProps) {
                 return (
                     <Button
                         variant="noShadow"
+                        size="sm"
                         onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
                     >
                         Sold Price
@@ -198,6 +208,7 @@ export function TransactionsTable({ data, userRollNumber }: DataTableProps) {
                 return (
                     <Button
                         variant="noShadow"
+                        size="sm"
                         onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
                     >
                         Role
@@ -231,6 +242,7 @@ export function TransactionsTable({ data, userRollNumber }: DataTableProps) {
                 return (
                     <Button
                         variant="noShadow"
+                        size="sm"
                         onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
                     >
                         Other Party
@@ -249,6 +261,7 @@ export function TransactionsTable({ data, userRollNumber }: DataTableProps) {
                 return (
                     <Button
                         variant="noShadow"
+                        size="sm"
                         onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
                     >
                         Time to Sale
@@ -266,6 +279,7 @@ export function TransactionsTable({ data, userRollNumber }: DataTableProps) {
         onSortingChange: setSorting,
         onColumnFiltersChange: setColumnFilters,
         onGlobalFilterChange: setGlobalFilter,
+        onColumnVisibilityChange: setColumnVisibility,
         getCoreRowModel: getCoreRowModel(),
         getPaginationRowModel: getPaginationRowModel(),
         getSortedRowModel: getSortedRowModel(),
@@ -274,6 +288,7 @@ export function TransactionsTable({ data, userRollNumber }: DataTableProps) {
             sorting,
             columnFilters,
             globalFilter,
+            columnVisibility,
         },
         globalFilterFn: (row, columnId, value) => {
             const searchValue = String(value).toLowerCase();
@@ -308,7 +323,7 @@ export function TransactionsTable({ data, userRollNumber }: DataTableProps) {
     })
 
     return (
-        <div className="space-y-4">
+        <div className="w-full font-base text-main-foreground space-y-4">
             <div className="flex items-center justify-between">
                 <div className="flex flex-1 items-center space-x-2">
                     <Input
@@ -363,15 +378,44 @@ export function TransactionsTable({ data, userRollNumber }: DataTableProps) {
                         </DropdownMenuContent>
                     </DropdownMenu>
                 </div>
+                <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                        <Button variant="noShadow">
+                            Columns <ChevronDown className="ml-2 h-4 w-4" />
+                        </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end" className="bg-main border-2 border-border">
+                        {table
+                            .getAllColumns()
+                            .filter((column) => column.getCanHide())
+                            .map((column) => {
+                                return (
+                                    <DropdownMenuCheckboxItem
+                                        key={column.id}
+                                        className="capitalize"
+                                        checked={column.getIsVisible()}
+                                        onCheckedChange={(value) =>
+                                            column.toggleVisibility(!!value)
+                                        }
+                                    >
+                                        {column.id}
+                                    </DropdownMenuCheckboxItem>
+                                )
+                            })}
+                    </DropdownMenuContent>
+                </DropdownMenu>
             </div>
             <div className="border-2 border-border overflow-hidden">
                 <Table>
-                    <TableHeader>
+                    <TableHeader className="font-heading">
                         {table.getHeaderGroups().map((headerGroup) => (
-                            <TableRow key={headerGroup.id}>
+                            <TableRow
+                                className="bg-secondary-background text-foreground"
+                                key={headerGroup.id}
+                            >
                                 {headerGroup.headers.map((header) => {
                                     return (
-                                        <TableHead key={header.id}>
+                                        <TableHead className="text-foreground" key={header.id}>
                                             {header.isPlaceholder
                                                 ? null
                                                 : flexRender(
@@ -389,11 +433,10 @@ export function TransactionsTable({ data, userRollNumber }: DataTableProps) {
                             table.getRowModel().rows.map((row) => (
                                 <TableRow
                                     key={row.id}
-                                    data-state={row.getIsSelected() && "selected"}
-                                    className="border-b"
+                                    className="bg-secondary-background text-foreground"
                                 >
                                     {row.getVisibleCells().map((cell) => (
-                                        <TableCell key={cell.id} className="py-4">
+                                        <TableCell key={cell.id} className="px-4 py-2">
                                             {flexRender(cell.column.columnDef.cell, cell.getContext())}
                                         </TableCell>
                                     ))}
@@ -409,10 +452,10 @@ export function TransactionsTable({ data, userRollNumber }: DataTableProps) {
                     </TableBody>
                 </Table>
             </div>
-            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between space-y-2 sm:space-y-0 sm:space-x-2 py-4">
-                <div className="text-sm text-muted-foreground">
-                    Showing {table.getRowModel().rows.length} of{" "}
-                    {data.length} transaction(s)
+            <div className="flex items-center justify-between space-x-2 py-4">
+                <div className="text-sm text-muted-foreground flex-1">
+                    Showing {table.getRowModel().rows.length} of {" "}
+                    {table.getFilteredRowModel().rows.length} transaction(s)
                 </div>
                 <div className="flex space-x-2">
                     <Button

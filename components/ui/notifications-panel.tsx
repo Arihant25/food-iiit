@@ -133,18 +133,6 @@ export default function NotificationsPanel() {
         requestNotificationPermission()
     }, [])
 
-    const handleNotificationClick = (notification: Notification) => {
-        // Mark as read
-        if (!notification.read) {
-            markAsRead(notification.id)
-        }
-
-        // Navigate based on notification type
-        if (notification.data?.listing_id) {
-            window.location.href = `/mess/listings/${notification.data.listing_id}`
-        }
-    }
-
     return (
         <Card className="w-full">
             <CardHeader className="pb-3">
@@ -169,10 +157,9 @@ export default function NotificationsPanel() {
                                 <div
                                     key={notification.id}
                                     className={cn(
-                                        "py-3 cursor-pointer hover:bg-main/5 rounded-md transition-colors",
+                                        "py-3 hover:bg-main/5 rounded-md transition-colors",
                                         !notification.read && "bg-main/10"
                                     )}
-                                    onClick={() => handleNotificationClick(notification)}
                                 >
                                     <div className="flex justify-between items-start">
                                         <h4 className="font-semibold text-sm">{notification.title}</h4>
