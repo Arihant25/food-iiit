@@ -1,17 +1,11 @@
 "use client"
 
-import React, { useState, useEffect, useRef } from "react"
-import { Bell } from "lucide-react"
+import React, { useState, useEffect } from "react"
 import { supabase } from "@/lib/supabaseClient"
 import { useSession } from "next-auth/react"
-import {
-    Popover,
-    PopoverContent,
-    PopoverTrigger,
-} from "@/components/ui/popover"
 import { Button } from "@/components/ui/button"
-import { cn } from "@/lib/utils"
-import { formatRelativeTime } from "@/lib/utils"
+import { cn, formatRelativeTime } from "@/lib/utils"
+import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card"
 
 interface Notification {
     id: string
@@ -23,12 +17,10 @@ interface Notification {
     data: any
 }
 
-export default function NotificationBell() {
+export default function NotificationsPanel() {
     const { data: session } = useSession()
     const [notifications, setNotifications] = useState<Notification[]>([])
     const [unreadCount, setUnreadCount] = useState(0)
-    const [open, setOpen] = useState(false)
-    const bellRef = useRef<HTMLButtonElement>(null)
 
     // Fetch notifications
     useEffect(() => {
@@ -154,47 +146,30 @@ export default function NotificationBell() {
     }
 
     return (
-        <Popover open={open} onOpenChange={setOpen}>
-            <PopoverTrigger asChild>
-                <Button
-                    ref={bellRef}
-                    variant="noShadow"
-                    size="icon"
-                    className="relative"
-                    aria-label="Notifications"
-                >
-                    <Bell className="h-[1.2rem] w-[1.2rem]" />
-                    {unreadCount > 0 && (
-                        <span className="absolute -top-1 -right-1 rounded-full bg-red-500 w-5 h-5 text-xs flex items-center justify-center text-white">
-                            {unreadCount > 9 ? '9+' : unreadCount}
-                        </span>
-                    )}
-                </Button>
-            </PopoverTrigger>
-            <PopoverContent
-                className="w-80 max-h-[400px] p-0 overflow-hidden flex flex-col"
-                align="end"
-            >
-                <div className="p-3 border-b flex justify-between items-center">
-                    <h3 className="font-bold">Notifications</h3>
+        <Card className="w-full">
+            <CardHeader className="pb-3">
+                <div className="flex justify-between items-center gap-4">
+                    <CardTitle className="text-xl truncate">Notifications</CardTitle>
                     {unreadCount > 0 && (
                         <Button
-                            variant="noShadow"
-                            className="h-8 text-xs"
+                            variant="default"
+                            className="h-8 text-xs shrink-0"
                             onClick={() => markAsRead()}
                         >
-                            Mark all as read
+                            Clear all
                         </Button>
                     )}
                 </div>
-                <div className="overflow-y-auto flex-1">
+            </CardHeader>
+            <CardContent>
+                <div className="max-h-[calc(100vh-12rem)] overflow-y-auto">
                     {notifications.length > 0 ? (
                         <div className="divide-y">
                             {notifications.map(notification => (
                                 <div
                                     key={notification.id}
                                     className={cn(
-                                        "p-3 cursor-pointer hover:bg-main/5",
+                                        "py-3 cursor-pointer hover:bg-main/5 rounded-md transition-colors",
                                         !notification.read && "bg-main/10"
                                     )}
                                     onClick={() => handleNotificationClick(notification)}
@@ -211,11 +186,11 @@ export default function NotificationBell() {
                         </div>
                     ) : (
                         <div className="p-8 text-center text-muted-foreground">
-                            <p>No notifications yet</p>
+                            <p>Your notifications will appear here... when you have any.</p>
                         </div>
                     )}
                 </div>
-            </PopoverContent>
-        </Popover>
+            </CardContent>
+        </Card>
     )
 }

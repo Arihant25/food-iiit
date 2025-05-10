@@ -2,7 +2,6 @@
 
 import SwitchButton from "@/components/navigation/SwitchButton";
 import AvatarBanner from "@/components/navigation/AvatarBanner";
-import NotificationBanner from "@/components/navigation/NotificationBanner";
 import { useSession } from "next-auth/react";
 import { useRouter, usePathname } from "next/navigation";
 import { useEffect } from "react";
@@ -67,9 +66,6 @@ export default function MessLayout({
 
                 <SwitchButton />
             </div>
-            <NotificationBanner>
-                {/* This is an empty fragment, content will be added by the NotificationBanner */}
-            </NotificationBanner>
             <AvatarBanner
                 items={navigationItems}
                 onAvatarClick={handleAvatarClick}

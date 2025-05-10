@@ -364,7 +364,7 @@ export function TransactionsTable({ data, userRollNumber }: DataTableProps) {
                     </DropdownMenu>
                 </div>
             </div>
-            <div className="rounded-md border">
+            <div className="border-2 border-border overflow-hidden">
                 <Table>
                     <TableHeader>
                         {table.getHeaderGroups().map((headerGroup) => (
@@ -390,11 +390,10 @@ export function TransactionsTable({ data, userRollNumber }: DataTableProps) {
                                 <TableRow
                                     key={row.id}
                                     data-state={row.getIsSelected() && "selected"}
-                                    className="cursor-pointer hover:bg-muted/50"
-                                    onClick={() => router.push(`/mess/listings/transaction/${row.original.id}`)}
+                                    className="border-b"
                                 >
                                     {row.getVisibleCells().map((cell) => (
-                                        <TableCell key={cell.id}>
+                                        <TableCell key={cell.id} className="py-4">
                                             {flexRender(cell.column.columnDef.cell, cell.getContext())}
                                         </TableCell>
                                     ))}

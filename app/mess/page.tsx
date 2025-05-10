@@ -2,9 +2,12 @@
 
 import SwitchButton from "@/components/navigation/SwitchButton";
 import AvatarBanner from "@/components/navigation/AvatarBanner";
+import NotificationsPanel from "@/components/ui/notifications-panel";
+import Marquee from "@/components/ui/marquee"
 import { useSession } from "next-auth/react";
 import { useRouter, usePathname } from "next/navigation";
 import { useEffect } from "react";
+import { PageHeading } from "@/components/ui/page-heading"
 
 export default function MessPage() {
     const router = useRouter();
@@ -50,18 +53,38 @@ export default function MessPage() {
         router.push(`/mess/${item.id}`);
     };
 
+    const messes = [
+        {
+            id: "1",
+            name: "North"
+        },
+        {
+            id: "2",
+            name: "South"
+        },
+        {
+            id: "3",
+            name: "Kadamba"
+        },
+        {
+            id: "4",
+            name: "Yuktahar"
+        }
+    ]
+
     return (
-        <div className="relative p-6">
-            <div className="mx-9 ml-18">
-                <h1 className="text-2xl font-bold mb-4">Mess</h1>
+        <div className="px-6 py-4 flex flex-col justify-center min-h-screen">
 
-                {/* Content for mess page goes here */}
-                <div className="p-4 bg-secondary-background rounded-lg border-2 border-border">
-                    <p>Mess information and meal options will be displayed here.</p>
-                </div>
+            <PageHeading title="WHAT'S COOKING?" />
 
+            <Marquee items={[...messes].sort(() => 0.5 - Math.random()).map(canteen => canteen.name.toUpperCase())} />
+
+            <div className="my-6">
+                <NotificationsPanel />
                 <SwitchButton />
             </div>
+
+            <Marquee items={[...messes].sort(() => 0.5 - Math.random()).map(canteen => canteen.name.toUpperCase())} />
             <AvatarBanner
                 items={navigationItems}
                 onAvatarClick={handleAvatarClick}
