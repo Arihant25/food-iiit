@@ -15,6 +15,7 @@ import { Card } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
+import { TransactionsTable } from "@/components/transactions/transaction-table"
 
 interface Listing {
     id: string
@@ -528,26 +529,8 @@ export default function DashboardPage() {
 
                                         {listing.bids && listing.bids.length > 0 && (
                                             <div className="mt-3 mb-3">
-                                                <h4 className="text-sm font-semibold mb-2">Top bids:</h4>
-                                                <div className="space-y-2 max-h-32 overflow-y-auto">
-                                                    {listing.bids.slice(0, 3).map((bid) => (
-                                                        <div key={bid.id} className="flex justify-between items-center p-2 bg-muted/30 rounded-md">
-                                                            <span className="text-sm">{bid.buyer_name}</span>
-                                                            <div className="flex items-center gap-2">
-                                                                <span className="font-medium">{formatPrice(bid.bid_price)}</span>
-                                                                <Button
-                                                                    variant="default"
-                                                                    size="sm"
-                                                                    onClick={(e) => {
-                                                                        e.stopPropagation();
-                                                                        acceptBid(listing.id, bid.id, bid.bid_price, bid.buyer_roll_number);
-                                                                    }}
-                                                                >
-                                                                    Accept
-                                                                </Button>
-                                                            </div>
-                                                        </div>
-                                                    ))}
+                                                <div className="flex justify-between items-center bg-muted/30 rounded-md">
+                                                    <span className="text-sm font-medium">{listing.bids.length} bids</span> 
                                                 </div>
                                             </div>
                                         )}
@@ -729,73 +712,7 @@ export default function DashboardPage() {
                             <p>Loading transaction history...</p>
                         </div>
                     ) : transactions.length > 0 ? (
-                        <div className="overflow-auto w-full rounded-md border">
-                            <Table className="min-w-full">
-                                <TableHeader className="bg-muted/50">
-                                    <TableRow>
-                                        <TableHead className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
-                                            Date
-                                        </TableHead>
-                                        <TableHead className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
-                                            Meal
-                                        </TableHead>
-                                        <TableHead className="text-xs font-medium text-muted-foreground uppercase tracking-wider hidden md:table-cell">
-                                            Mess
-                                        </TableHead>
-                                        <TableHead className="text-xs font-medium text-muted-foreground uppercase tracking-wider hidden lg:table-cell">
-                                            Listed Price
-                                        </TableHead>
-                                        <TableHead className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
-                                            Sold Price
-                                        </TableHead>
-                                        <TableHead className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
-                                            Role
-                                        </TableHead>
-                                        <TableHead className="text-xs font-medium text-muted-foreground uppercase tracking-wider hidden sm:table-cell">
-                                            Other Party
-                                        </TableHead>
-                                        <TableHead className="text-xs font-medium text-muted-foreground uppercase tracking-wider hidden xl:table-cell">
-                                            Time to Sale
-                                        </TableHead>
-                                    </TableRow>
-                                </TableHeader>
-                                <TableBody className="bg-card divide-y divide-border">
-                                    {transactions.map((tx) => {
-                                        const isUserBuyer = tx.buyer_id === session?.user?.rollNumber;
-                                        return (
-                                            <TableRow key={tx.id} className="hover:bg-muted/50 cursor-pointer" onClick={() => router.push(`/mess/listings/transaction/${tx.id}`)}>
-                                                <TableCell className="whitespace-nowrap text-sm">
-                                                    {formatDate(tx.date_of_transaction)}
-                                                </TableCell>
-                                                <TableCell className="whitespace-nowrap text-sm">
-                                                    {tx.meal}
-                                                </TableCell>
-                                                <TableCell className="whitespace-nowrap text-sm hidden md:table-cell">
-                                                    {tx.mess}
-                                                </TableCell>
-                                                <TableCell className="whitespace-nowrap text-sm hidden lg:table-cell">
-                                                    {formatPrice(tx.listing_price)}
-                                                </TableCell>
-                                                <TableCell className="whitespace-nowrap text-sm font-medium">
-                                                    {formatPrice(tx.sold_price)}
-                                                </TableCell>
-                                                <TableCell className="whitespace-nowrap text-sm">
-                                                    <span className={`px-2 py-1 rounded-full text-xs font-semibold ${isUserBuyer ? "bg-blue-100 text-blue-800" : "bg-emerald-100 text-emerald-800"}`}>
-                                                        {isUserBuyer ? "Buyer" : "Seller"}
-                                                    </span>
-                                                </TableCell>
-                                                <TableCell className="whitespace-nowrap text-sm hidden sm:table-cell">
-                                                    {isUserBuyer ? tx.seller_name : tx.buyer_name}
-                                                </TableCell>
-                                                <TableCell className="whitespace-nowrap text-sm text-muted-foreground hidden xl:table-cell">
-                                                    {tx.time_gap}
-                                                </TableCell>
-                                            </TableRow>
-                                        );
-                                    })}
-                                </TableBody>
-                            </Table>
-                        </div>
+                        <TransactionsTable data={transactions} userRollNumber={session?.user?.rollNumber || ""} />
                     ) : (
                         <div className="flex flex-col items-center justify-center h-64 text-center">
                             <p className="mb-4">No transaction history yet.</p>
