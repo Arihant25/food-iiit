@@ -382,7 +382,6 @@ export default function ListingsPage() {
             return data.data?.meal_mess || null
         } catch (error) {
             console.error("Error fetching mess registration:", error)
-            toast.error("Failed to fetch your mess registration")
             return null
         } finally {
             setIsMessLoading(false)
@@ -442,7 +441,6 @@ export default function ListingsPage() {
             const userMess = await fetchUserMess(newListing.date, newListing.meal);
 
             if (!userMess) {
-                toast.error("Failed to fetch your mess registration");
                 setIsMessLoading(false);
                 return;
             }

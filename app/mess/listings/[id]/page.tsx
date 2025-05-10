@@ -8,6 +8,11 @@ import { toast } from "sonner"
 import { format } from "date-fns"
 import { CalendarDays, Clock, User, Phone, AlertCircle, ArrowLeft, Edit2, AlertTriangle, Share2 } from "lucide-react"
 
+// Helper function to format dates consistently throughout the component
+const formatDate = (dateString: string) => {
+    return format(new Date(dateString), "MMMM d, yyyy");
+}
+
 import { PageHeading } from "@/components/ui/page-heading"
 import { MessIcon } from "@/components/ui/mess-icon"
 import { Card, CardContent, CardHeader, CardTitle, CardFooter } from "@/components/ui/card"
@@ -559,7 +564,7 @@ export default function ListingDetailPage() {
             if (bidError) throw bidError
 
             // Create transaction history entry
-            const { error: txError } = await supabase
+            const { data: txData, error: txError } = await supabase
                 .from("transaction_history")
                 .insert({
                     date_of_transaction: new Date().toISOString().split('T')[0],
@@ -572,8 +577,39 @@ export default function ListingDetailPage() {
                     listing_created_at: listing.created_at,
                     sold_time: new Date().toISOString()
                 })
+                .select('id')
+                .single()
 
             if (txError) throw txError
+
+            // Fetch the seller's token using their API key
+            const tokenResponse = await fetch(`/api/user-token?userId=${listing.seller_id}`);
+
+            if (!tokenResponse.ok) {
+                console.error("Failed to fetch seller token:", await tokenResponse.json());
+                // Continue with the process even if token fetch fails
+            } else {
+                const tokenData = await tokenResponse.json();
+                const sellerToken = tokenData.token;
+
+                if (sellerToken) {
+                    // Create record in the purchases table with meal date from the listing
+                    // The purchase record will be used to display in My Purchases section until the meal date passes
+                    // The transaction_id is a foreign key to the transaction_history table
+                    const { error: purchaseError } = await supabase
+                        .from("purchases")
+                        .insert({
+                            transaction_id: txData.id,
+                            seller_token: sellerToken,
+                            meal_date: new Date(listing.date).toISOString().split('T')[0]
+                        });
+
+                    if (purchaseError) {
+                        console.error("Error creating purchase record:", purchaseError);
+                        // Continue with the process even if purchase creation fails
+                    }
+                }
+            }
 
             // Send notification to the buyer
             if (typeof window !== 'undefined') {

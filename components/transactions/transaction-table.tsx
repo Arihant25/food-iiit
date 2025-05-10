@@ -220,7 +220,7 @@ export function TransactionsTable({ data, userRollNumber }: DataTableProps) {
                 const isUserBuyer = row.original.buyer_id === userRollNumber
                 return (
                     <div>
-                        <span className={`px-2 py-1 rounded-full text-xs font-semibold ${isUserBuyer ? "bg-blue-100 text-blue-800" : "bg-emerald-100 text-emerald-800"}`}>
+                        <span className={"px-2 py-1 text-xs font-semibold"}>
                             {isUserBuyer ? "Buyer" : "Seller"}
                         </span>
                     </div>

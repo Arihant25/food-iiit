@@ -32,6 +32,27 @@ interface Listing {
     transaction?: boolean
 }
 
+interface Purchase {
+    id: string
+    transaction_id: string
+    seller_token: string
+    meal_date: string
+    created_at: string
+    transaction?: {
+        id: string
+        date_of_transaction: string
+        meal: string
+        mess: string
+        sold_price: number
+        listing_price: number
+        buyer_id: string
+        seller_id: string
+        seller?: {
+            name: string
+        }
+    }
+}
+
 interface bid {
     id: string
     buyer_roll_number: string
@@ -69,6 +90,7 @@ export default function DashboardPage() {
     const [purchasedListings, setPurchasedListings] = useState<Listing[]>([])
     const [myBids, setMyBids] = useState<bid[]>([])
     const [transactions, setTransactions] = useState<Transaction[]>([])
+    const [myPurchases, setMyPurchases] = useState<Purchase[]>([])
     const [loading, setLoading] = useState(true)
     const [activeTab, setActiveTab] = useState("sold")
 
@@ -77,6 +99,7 @@ export default function DashboardPage() {
             fetchUserListings()
             fetchUserBids()
             fetchTransactionHistory()
+            fetchMyPurchases()
             setupRealTimeSubscriptions()
         }
 
@@ -141,6 +164,23 @@ export default function DashboardPage() {
                     fetchTransactionHistory()
                     fetchUserListings()
                     fetchUserBids()
+                }
+            )
+            .subscribe()
+
+        // Subscribe to purchases
+        const purchasesChannel = supabase
+            .channel('dashboard-purchases')
+            .on(
+                'postgres_changes',
+                {
+                    event: '*',
+                    schema: 'public',
+                    table: 'purchases',
+                },
+                (payload) => {
+                    console.log('Purchase change received:', payload)
+                    fetchMyPurchases()
                 }
             )
             .subscribe()
@@ -321,7 +361,45 @@ export default function DashboardPage() {
             console.error("Error fetching transaction history:", error)
             toast.error("Failed to load transaction history")
         }
-    }
+    }    // Fetch the user's active purchases (purchases that haven't expired)
+    // Purchases are considered "active" when the meal_date is today or in the future
+    // Once the meal_date passes, purchases won't show up in the My Purchases section anymore
+    const fetchMyPurchases = async () => {
+        if (!session?.user?.rollNumber) return;
+
+        try {
+            // Get current date
+            const today = new Date().toISOString().split('T')[0];
+
+            // Fetch purchases where the user is the buyer and meal date is today or in the future
+            // Use the specific foreign key name to avoid ambiguity
+            const { data, error } = await supabase
+                .from("purchases")
+                .select(`
+                    *,
+                    transaction:transaction_history!purchases_transaction_id_fkey (
+                        *,
+                        seller:seller_id (name)
+                    )
+                `)
+                .gte('meal_date', today)
+                .order('meal_date', { ascending: true });
+
+            if (error) throw error;
+
+            if (data) {
+                // Now get just purchases where the current user is the buyer
+                const userPurchases = data.filter(purchase =>
+                    purchase.transaction?.buyer_id === session.user.rollNumber
+                );
+
+                setMyPurchases(userPurchases);
+            }
+        } catch (error) {
+            console.error("Error fetching purchases:", error);
+            toast.error("Failed to load your purchases");
+        }
+    };
 
     // Accept a bid for a listing
     const acceptBid = async (listingId: string, bidId: string, bidPrice: number, buyerRollNumber: string) => {
@@ -425,6 +503,7 @@ export default function DashboardPage() {
 
     // Format price to INR
     const formatPrice = (price: number | undefined) => {
+        if (price === undefined) return "₹0";
         return new Intl.NumberFormat('en-IN', {
             style: 'currency',
             currency: 'INR',
@@ -639,6 +718,61 @@ export default function DashboardPage() {
                     {loading ? (
                         <div className="flex justify-center items-center h-64">
                             <p>Loading your purchases...</p>
+                        </div>
+                    ) : myPurchases.length > 0 ? (
+                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-6">
+                            {myPurchases.map((purchase) => (
+                                <Card
+                                    key={purchase.id}
+                                    className="overflow-hidden hover:shadow-lg transition-shadow"
+                                >
+                                    <div className="p-4 relative">
+                                        <div className="absolute top-4 right-4">
+                                            <span className="px-2 py-1 rounded-full text-xs font-semibold bg-emerald-100 text-emerald-800">
+                                                Active Meal
+                                            </span>
+                                        </div>
+
+                                        <div className="flex items-start mb-3 mt-6">
+                                            <div className="flex items-center gap-2">
+                                                <MessIcon messName={purchase.transaction?.mess || ""} />
+                                                <div>
+                                                    <h3 className="text-xl font-bold">{purchase.transaction?.mess}</h3>
+                                                    <p className="text-lg">{purchase.transaction?.meal}</p>
+                                                </div>
+                                            </div>
+                                        </div>
+
+                                        <div className="flex items-center gap-2 text-muted-foreground mb-2">
+                                            <CalendarDays className="h-4 w-4" />
+                                            <p>{formatDate(purchase.meal_date)}</p>
+                                        </div>
+
+                                        <div className="flex items-center gap-1 text-muted-foreground mb-3">
+                                            <TagIcon className="h-4 w-4" />
+                                            <p>Paid: {formatPrice(purchase.transaction?.sold_price)}</p>
+                                        </div>
+
+                                        <div className="mt-3 p-3 bg-blue-50 border border-blue-200">
+                                            <p className="text-sm text-blue-800 mb-2 font-semibold">
+                                                Meal Token:
+                                            </p>
+                                            <div className="bg-white p-2 border border-blue-200 overflow-auto">
+                                                <code className="text-xs break-all">{purchase.seller_token}</code>
+                                            </div>
+                                        </div>
+
+                                        <div className="flex justify-between items-center mt-3 pt-3 border-t border-border/30">
+                                            <p className="text-xs text-muted-foreground">
+                                                Purchased {formatRelativeTime(purchase.created_at)}
+                                            </p>
+                                            <p className="text-sm font-medium">
+                                                Seller: {purchase.transaction?.seller?.name}
+                                            </p>
+                                        </div>
+                                    </div>
+                                </Card>
+                            ))}
                         </div>
                     ) : purchasedListings.length > 0 ? (
                         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-6">
