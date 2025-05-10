@@ -51,6 +51,7 @@ export function TransactionsTable({ data, userRollNumber }: DataTableProps) {
     const router = useRouter()
     const [sorting, setSorting] = useState<SortingState>([])
     const [columnFilters, setColumnFilters] = useState<ColumnFiltersState>([])
+    const [globalFilter, setGlobalFilter] = useState<string>("")
 
     // Format date to show "28th May (Tue)"
     const formatDate = (dateString: string) => {
@@ -114,7 +115,7 @@ export function TransactionsTable({ data, userRollNumber }: DataTableProps) {
             header: ({ column }) => {
                 return (
                     <Button
-                        variant="neutral"
+                        variant="noShadow"
                         onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
                     >
                         Date
@@ -129,7 +130,7 @@ export function TransactionsTable({ data, userRollNumber }: DataTableProps) {
             header: ({ column }) => {
                 return (
                     <Button
-                        variant="neutral"
+                        variant="noShadow"
                         onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
                     >
                         Meal
@@ -147,7 +148,7 @@ export function TransactionsTable({ data, userRollNumber }: DataTableProps) {
             header: ({ column }) => {
                 return (
                     <Button
-                        variant="neutral"
+                        variant="noShadow"
                         onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
                     >
                         Mess
@@ -164,7 +165,7 @@ export function TransactionsTable({ data, userRollNumber }: DataTableProps) {
             header: ({ column }) => {
                 return (
                     <Button
-                        variant="neutral"
+                        variant="noShadow"
                         onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
                     >
                         Listed Price
@@ -179,7 +180,7 @@ export function TransactionsTable({ data, userRollNumber }: DataTableProps) {
             header: ({ column }) => {
                 return (
                     <Button
-                        variant="neutral"
+                        variant="noShadow"
                         onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
                     >
                         Sold Price
@@ -205,6 +206,10 @@ export function TransactionsTable({ data, userRollNumber }: DataTableProps) {
                 )
             },
             filterFn: (row, id, value) => {
+                // If no filters are applied (empty array), show all rows
+                if (!value || (Array.isArray(value) && value.length === 0)) {
+                    return true
+                }
                 const isUserBuyer = row.original.buyer_id === userRollNumber
                 const role = isUserBuyer ? "buyer" : "seller"
                 return value.includes(role)
@@ -223,7 +228,7 @@ export function TransactionsTable({ data, userRollNumber }: DataTableProps) {
             header: ({ column }) => {
                 return (
                     <Button
-                        variant="neutral"
+                        variant="noShadow"
                         onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
                     >
                         Time to Sale
@@ -240,6 +245,7 @@ export function TransactionsTable({ data, userRollNumber }: DataTableProps) {
         columns,
         onSortingChange: setSorting,
         onColumnFiltersChange: setColumnFilters,
+        onGlobalFilterChange: setGlobalFilter,
         getCoreRowModel: getCoreRowModel(),
         getPaginationRowModel: getPaginationRowModel(),
         getSortedRowModel: getSortedRowModel(),
@@ -247,6 +253,37 @@ export function TransactionsTable({ data, userRollNumber }: DataTableProps) {
         state: {
             sorting,
             columnFilters,
+            globalFilter,
+        },
+        globalFilterFn: (row, columnId, value) => {
+            const searchValue = String(value).toLowerCase();
+
+            // Search across all visible columns
+            if (columnId === "date_of_transaction") {
+                // Special handling for dates - use the formatted date that's displayed to user
+                const dateString = row.getValue("date_of_transaction") as string;
+                const date = new Date(dateString);
+                const formattedDate = format(date, "do MMMM (EEE)").toLowerCase();
+
+                // Also include raw date format for flexibility in searching
+                const rawDate = dateString.toLowerCase();
+
+                return formattedDate.includes(searchValue) || rawDate.includes(searchValue);
+            } else if (columnId === "role") {
+                // Special handling for the role column which isn't a direct value
+                const isUserBuyer = row.original.buyer_id === userRollNumber;
+                const roleText = isUserBuyer ? "buyer" : "seller";
+                return roleText.includes(searchValue);
+            } else if (columnId === "other_party") {
+                // Special handling for other_party column which combines fields
+                const isUserBuyer = row.original.buyer_id === userRollNumber;
+                const partyName = isUserBuyer ? row.original.seller_name : row.original.buyer_name;
+                return partyName?.toLowerCase().includes(searchValue) || false;
+            } else {
+                // Standard handling for all other columns
+                const cellValue = String(row.getValue(columnId) || "").toLowerCase();
+                return cellValue.includes(searchValue);
+            }
         },
     })
 
@@ -255,11 +292,9 @@ export function TransactionsTable({ data, userRollNumber }: DataTableProps) {
             <div className="flex items-center justify-between">
                 <div className="flex flex-1 items-center space-x-2">
                     <Input
-                        placeholder="Filter by meal..."
-                        value={(table.getColumn("meal")?.getFilterValue() as string) ?? ""}
-                        onChange={(event) =>
-                            table.getColumn("meal")?.setFilterValue(event.target.value)
-                        }
+                        placeholder="Search across all columns..."
+                        value={globalFilter}
+                        onChange={(event) => setGlobalFilter(event.target.value)}
                         className="max-w-sm"
                     />
                     <DropdownMenu>
@@ -268,7 +303,7 @@ export function TransactionsTable({ data, userRollNumber }: DataTableProps) {
                                 Filters <ChevronDown className="ml-2 h-4 w-4" />
                             </Button>
                         </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end">
+                        <DropdownMenuContent align="end" className="bg-main border-2 border-border">
                             <DropdownMenuCheckboxItem
                                 checked={
                                     table.getColumn("role")?.getFilterValue() === undefined ||
