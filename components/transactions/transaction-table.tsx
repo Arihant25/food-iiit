@@ -194,7 +194,17 @@ export function TransactionsTable({ data, userRollNumber }: DataTableProps) {
         },
         {
             accessorKey: "role",
-            header: "Role",
+            header: ({ column }) => {
+                return (
+                    <Button
+                        variant="noShadow"
+                        onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
+                    >
+                        Role
+                        <ArrowUpDown className="ml-2 h-4 w-4" />
+                    </Button>
+                )
+            },
             cell: ({ row }) => {
                 const isUserBuyer = row.original.buyer_id === userRollNumber
                 return (
@@ -217,7 +227,17 @@ export function TransactionsTable({ data, userRollNumber }: DataTableProps) {
         },
         {
             accessorKey: "other_party",
-            header: "Other Party",
+            header: ({ column }) => {
+                return (
+                    <Button
+                        variant="noShadow"
+                        onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
+                    >
+                        Other Party
+                        <ArrowUpDown className="ml-2 h-4 w-4" />
+                    </Button>
+                )
+            },
             cell: ({ row }) => {
                 const isUserBuyer = row.original.buyer_id === userRollNumber
                 return <div>{isUserBuyer ? row.original.seller_name : row.original.buyer_name}</div>
@@ -390,12 +410,12 @@ export function TransactionsTable({ data, userRollNumber }: DataTableProps) {
                     </TableBody>
                 </Table>
             </div>
-            <div className="flex items-center justify-end space-x-2 py-4">
-                <div className="flex-1 text-sm text-muted-foreground">
+            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between space-y-2 sm:space-y-0 sm:space-x-2 py-4">
+                <div className="text-sm text-muted-foreground">
                     Showing {table.getRowModel().rows.length} of{" "}
                     {data.length} transaction(s)
                 </div>
-                <div className="space-x-2">
+                <div className="flex space-x-2">
                     <Button
                         variant="noShadow"
                         size="sm"

@@ -6,7 +6,7 @@ import { useSession } from "next-auth/react"
 import { supabase } from "@/lib/supabaseClient"
 import { toast } from "sonner"
 import { format } from "date-fns"
-import { CalendarDays, Clock, User, Phone, AlertCircle, ArrowLeft } from "lucide-react"
+import { CalendarDays, Clock, User, Phone, AlertCircle, ArrowLeft, Edit2, AlertTriangle } from "lucide-react"
 
 import { PageHeading } from "@/components/ui/page-heading"
 import { MessIcon } from "@/components/ui/mess-icon"
@@ -14,6 +14,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardFooter } from "@/componen
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import UserAuthForm from "@/components/auth/UserAuthForm"
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog"
 
 interface Listing {
     id: string
@@ -60,6 +61,10 @@ export default function ListingDetailPage() {
     const [isSubmitting, setIsSubmitting] = useState(false)
     const [completingTransaction, setCompletingTransaction] = useState(false)
     const [showAuthForm, setShowAuthForm] = useState(false)
+    const [editMinPrice, setEditMinPrice] = useState(false)
+    const [newMinPrice, setNewMinPrice] = useState("")
+    const [updatingPrice, setUpdatingPrice] = useState(false)
+    const [showLowBidConfirmation, setShowLowBidConfirmation] = useState(false)
 
     useEffect(() => {
         if (id) {
@@ -132,6 +137,12 @@ export default function ListingDetailPage() {
             }
         }
     }, [session, bids])
+
+    useEffect(() => {
+        if (listing) {
+            setNewMinPrice(listing.min_price.toString())
+        }
+    }, [listing])
 
     const fetchListing = async () => {
         try {
@@ -309,10 +320,23 @@ export default function ListingDetailPage() {
 
         // Validate bid amount
         const bidValue = parseFloat(bidAmount)
-        if (isNaN(bidValue) || bidValue < (listing?.min_price || 0)) {
-            toast.error(`Bid must be at least ₹${listing?.min_price}`)
+        if (isNaN(bidValue) || bidValue < 0) {
+            toast.error(`Bid must be a positive amount`)
             return
         }
+
+        // If the bid is lower than the minimum price, ask for confirmation
+        if (bidValue < (listing?.min_price || 0)) {
+            setShowLowBidConfirmation(true)
+            return
+        }
+
+        await submitBid(bidValue)
+    }
+
+    // Submit the bid regardless of price
+    const submitBid = async (bidValue: number) => {
+        if (!session?.user || !listing) return
 
         try {
             setIsSubmitting(true)
@@ -394,6 +418,9 @@ export default function ListingDetailPage() {
 
                 toast.success(`Your bid of ₹${bidValue} has been placed`)
             }
+
+            // Reset the confirmation dialog
+            setShowLowBidConfirmation(false)
 
             // Refresh bids
             fetchBids()
@@ -572,6 +599,48 @@ export default function ListingDetailPage() {
         }
     }
 
+    // Update the minimum price (seller only)
+    const updateMinPrice = async () => {
+        if (!session?.user || session.user.rollNumber !== listing?.seller_id) {
+            toast.error("Only the seller can update the minimum price")
+            return
+        }
+
+        if (!listing) {
+            toast.error("Listing information is missing")
+            return
+        }
+
+        const minPriceValue = parseFloat(newMinPrice)
+        if (isNaN(minPriceValue) || minPriceValue < 0) {
+            toast.error("Please enter a valid price (0 or greater)")
+            return
+        }
+
+        try {
+            setUpdatingPrice(true)
+
+            // Update the listing with the new minimum price
+            const { error } = await supabase
+                .from("listings")
+                .update({ min_price: minPriceValue })
+                .eq("id", id)
+
+            if (error) throw error
+
+            toast.success(`Minimum price updated to ₹${minPriceValue}`)
+
+            // Update local state
+            setListing(prev => prev ? { ...prev, min_price: minPriceValue } : null)
+            setEditMinPrice(false)
+        } catch (error) {
+            console.error("Error updating minimum price:", error)
+            toast.error("Failed to update minimum price")
+        } finally {
+            setUpdatingPrice(false)
+        }
+    }
+
     const formatDate = (dateString: string) => {
         const date = new Date(dateString)
         return format(date, "do MMMM (EEE)")
@@ -611,9 +680,52 @@ export default function ListingDetailPage() {
                                     </p>
                                 </div>
                             </div>
-                            <span className="text-2xl font-bold">
-                                ₹{listing.min_price}
-                            </span>
+                            {session?.user?.rollNumber === listing.seller_id && editMinPrice ? (
+                                <div className="flex items-center gap-2">
+                                    <Input
+                                        type="number"
+                                        min="0"
+                                        value={newMinPrice}
+                                        onChange={(e) => setNewMinPrice(e.target.value)}
+                                        className="w-24"
+                                    />
+                                    <div className="flex flex-col gap-1">
+                                        <Button
+                                            size="sm"
+                                            onClick={updateMinPrice}
+                                            disabled={updatingPrice}
+                                        >
+                                            Save
+                                        </Button>
+                                        <Button
+                                            variant="neutral"
+                                            size="sm"
+                                            onClick={() => {
+                                                setEditMinPrice(false);
+                                                setNewMinPrice(listing.min_price.toString());
+                                            }}
+                                        >
+                                            Cancel
+                                        </Button>
+                                    </div>
+                                </div>
+                            ) : (
+                                <div className="flex items-center gap-2">
+                                    <span className="text-2xl font-bold">
+                                        ₹{listing.min_price}
+                                    </span>
+                                    {session?.user?.rollNumber === listing.seller_id && (
+                                        <Button
+                                            variant="neutral"
+                                            size="sm"
+                                            onClick={() => setEditMinPrice(true)}
+                                            className="ml-1"
+                                        >
+                                            <Edit2 className="h-4 w-4" />
+                                        </Button>
+                                    )}
+                                </div>
+                            )}
                         </CardHeader>
 
                         <CardContent className="p-6">
@@ -645,33 +757,30 @@ export default function ListingDetailPage() {
 
                                 {session?.user && session.user.rollNumber !== listing.seller_id && (
                                     <div className="border-t pt-4 mt-4">
-                                        <h3 className="text-lg font-medium mb-2">Place a Bid</h3>
+                                        <h3 className="text-lg font-medium">Place a Bid</h3>
                                         <div className="flex items-center gap-2">
                                             <Input
                                                 type="number"
-                                                min={listing.min_price}
+                                                min="0"
                                                 value={bidAmount}
                                                 onChange={(e) => setBidAmount(e.target.value)}
-                                                placeholder={`Minimum ₹${listing.min_price}`}
+                                                placeholder={`Suggested minimum: ₹${listing.min_price}`}
                                                 className="w-full"
                                             />
                                             <Button
                                                 onClick={handleBid}
-                                                disabled={!bidAmount || isSubmitting || parseFloat(bidAmount) < listing.min_price}
+                                                disabled={parseFloat(bidAmount) < 0 || isSubmitting}
                                             >
                                                 Bid
                                             </Button>
                                         </div>
-                                        <p className="text-sm text-muted-foreground mt-2">
-                                            Enter an amount greater than or equal to the minimum price.
-                                        </p>
                                     </div>
                                 )}
 
                                 {session?.user?.rollNumber === listing.seller_id && (
                                     <div className="bg-secondary-background/30 p-4 rounded-md mt-4">
                                         <p className="text-center text-muted-foreground">
-                                            This is your own listing.
+                                            This is how your listing will appear to others.
                                         </p>
                                     </div>
                                 )}
@@ -693,8 +802,8 @@ export default function ListingDetailPage() {
                         </CardFooter>
                     </Card>
 
-                    {/* Display bids section (visible to the seller only) */}
-                    {session?.user?.rollNumber === listing.seller_id && !listing.buyer_id && bids.length > 0 && (
+                    {/* Display bids section */}
+                    {!listing.buyer_id && bids.length > 0 && (
                         <Card className="md:col-span-1">
                             <CardHeader className="bg-main-foreground/5">
                                 <CardTitle className="text-xl font-bold">Bids ({bids.length})</CardTitle>
@@ -715,25 +824,27 @@ export default function ListingDetailPage() {
                                                 Bid placed on {new Date(bid.created_at).toLocaleDateString()} at {new Date(bid.created_at).toLocaleTimeString()}
                                             </p>
                                         </div>
-                                        <div className="flex gap-2">
-                                            {bid.accepted ? (
-                                                <Button
-                                                    onClick={() => markBidAsPaid(bid.id, bid.bid_price, bid.buyer_roll_number)}
-                                                    variant="noShadow"
-                                                    className="bg-emerald-100 border-emerald-800 text-emerald-800"
-                                                    disabled={bid.paid || completingTransaction}
-                                                >
-                                                    {bid.paid ? "Paid" : "Mark as Paid"}
-                                                </Button>
-                                            ) : (
-                                                <Button
-                                                    onClick={() => acceptBid(bid.id, bid.bid_price, bid.buyer_roll_number)}
-                                                    disabled={completingTransaction}
-                                                >
-                                                    Accept Bid
-                                                </Button>
-                                            )}
-                                        </div>
+                                        {session?.user?.rollNumber === listing.seller_id && (
+                                            <div className="flex gap-2">
+                                                {bid.accepted ? (
+                                                    <Button
+                                                        onClick={() => markBidAsPaid(bid.id, bid.bid_price, bid.buyer_roll_number)}
+                                                        variant="noShadow"
+                                                        className="bg-emerald-100 border-emerald-800 text-emerald-800"
+                                                        disabled={bid.paid || completingTransaction}
+                                                    >
+                                                        {bid.paid ? "Paid" : "Mark as Paid"}
+                                                    </Button>
+                                                ) : (
+                                                    <Button
+                                                        onClick={() => acceptBid(bid.id, bid.bid_price, bid.buyer_roll_number)}
+                                                        disabled={completingTransaction}
+                                                    >
+                                                        Accept Bid
+                                                    </Button>
+                                                )}
+                                            </div>
+                                        )}
                                     </div>
                                 ))}
                             </CardContent>
@@ -757,6 +868,39 @@ export default function ListingDetailPage() {
                 onClose={() => setShowAuthForm(false)}
                 requireApiKey={false} // Don't require API key for buyers placing bids
             />
+
+            {/* Confirmation dialog for bidding below minimum price */}
+            <Dialog open={showLowBidConfirmation} onOpenChange={setShowLowBidConfirmation}>
+                <DialogContent>
+                    <DialogHeader>
+                        <div className="flex items-center gap-2">
+                            <AlertTriangle className="h-5 w-5 text-yellow-500" />
+                            <DialogTitle>Bid Below Suggested Price</DialogTitle>
+                        </div>
+                        <DialogDescription>
+                            You are about to place a bid below the seller's suggested minimum price of ₹{listing?.min_price}.
+                            Are you sure you want to continue?
+                        </DialogDescription>
+                    </DialogHeader>
+                    <p className="text-sm text-gray-500">
+                        The seller may be less likely to accept bids below their suggested minimum price.
+                    </p>
+                    <DialogFooter>
+                        <Button
+                            variant="neutral"
+                            onClick={() => setShowLowBidConfirmation(false)}
+                        >
+                            Cancel
+                        </Button>
+                        <Button
+                            onClick={() => submitBid(parseFloat(bidAmount))}
+                            disabled={isSubmitting}
+                        >
+                            Yes, Place Bid
+                        </Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
         </div>
     )
 }

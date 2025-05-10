@@ -459,23 +459,24 @@ export default function DashboardPage() {
             <PageHeading title="My Dashboard" />
 
             <Tabs defaultValue="sold" className="w-full" onValueChange={setActiveTab}>
-                <TabsList className="grid w-full grid-cols-2 md:grid-cols-4 mb-4 md:mb-8 overflow-x-auto">
-                    <TabsTrigger value="sold" className="flex items-center justify-center">
-                        <ReceiptText className="h-4 w-4 mr-2" />
+                <TabsList className="grid w-full grid-cols-4 mb-4 md:mb-8">
+                    <TabsTrigger value="sold" className="flex items-center justify-center text-xs sm:text-sm">
+                        <ReceiptText className="h-3 w-3 sm:h-4 sm:w-4 mr-1 sm:mr-2 hidden sm:inline" />
                         <span className="hidden sm:inline">My Listings</span>
                         <span className="sm:hidden">Listings</span>
                     </TabsTrigger>
-                    <TabsTrigger value="purchased" className="flex items-center justify-center">
-                        <ShoppingBag className="h-4 w-4 mr-2" />
+                    <TabsTrigger value="purchased" className="flex items-center justify-center text-xs sm:text-sm">
+                        <ShoppingBag className="h-3 w-3 sm:h-4 sm:w-4 mr-1 sm:mr-2 hidden sm:inline" />
                         <span className="hidden sm:inline">Purchases</span>
                         <span className="sm:hidden">Bought</span>
                     </TabsTrigger>
-                    <TabsTrigger value="bids" className="flex items-center justify-center">
-                        <TagIcon className="h-4 w-4 mr-2" />
-                        <span>My Bids</span>
+                    <TabsTrigger value="bids" className="flex items-center justify-center text-xs sm:text-sm">
+                        <TagIcon className="h-3 w-3 sm:h-4 sm:w-4 mr-1 sm:mr-2 hidden sm:inline" />
+                        <span className="sm:hidden">Bids</span>
+                        <span className="hidden sm:inline">My Bids</span>
                     </TabsTrigger>
-                    <TabsTrigger value="history" className="flex items-center justify-center">
-                        <CalendarDays className="h-4 w-4 mr-2" />
+                    <TabsTrigger value="history" className="flex items-center justify-center text-xs sm:text-sm">
+                        <CalendarDays className="h-3 w-3 sm:h-4 sm:w-4 mr-1 sm:mr-2 hidden sm:inline" />
                         <span className="hidden sm:inline">History</span>
                         <span className="sm:hidden">Log</span>
                     </TabsTrigger>
@@ -529,7 +530,7 @@ export default function DashboardPage() {
                                         {listing.bids && listing.bids.length > 0 && (
                                             <div className="mt-3 mb-3">
                                                 <div className="flex justify-between items-center bg-muted/30 rounded-md">
-                                                    <span className="text-sm font-medium">{listing.bids.length} bids</span> 
+                                                    <span className="text-sm font-medium">{listing.bids.length} bids</span>
                                                 </div>
                                             </div>
                                         )}

@@ -411,7 +411,7 @@ export default function ListingsPage() {
         const { name, value } = e.target
         setNewListing({
             ...newListing,
-            [name]: name === "min_price" ? parseFloat(value) : value,
+            [name]: name === "min_price" ? (value === "" ? 0 : parseFloat(value)) : value,
         })
     }
 
@@ -428,6 +428,11 @@ export default function ListingsPage() {
         if (!newListing.date || !newListing.meal || newListing.min_price < 0 || newListing.min_price === undefined) {
             toast.error("Please fill in all required fields");
             return;
+        }
+
+        // Inform the user if they're listing for free
+        if (newListing.min_price === 0) {
+            toast.info("You're listing this meal with no minimum price (₹0)");
         }
 
         try {
@@ -593,10 +598,10 @@ export default function ListingsPage() {
                             </SelectTrigger>
                             <SelectContent>
                                 <SelectItem value="all">All Messes</SelectItem>
-                                {["Yuktahaar", "South", "North", "Kadamba"].map((mess) => (
+                                {["Yuktahar", "South", "North", "Kadamba"].map((mess) => (
                                     <SelectItem key={mess} value={mess} className="flex items-center">
                                         <div className="flex items-center">
-                                            <MessIcon messName={mess} size={18} />
+                                            <MessIcon className="text-white" messName={mess} size={18} />
                                             <span className="ml-2">{mess}</span>
                                         </div>
                                     </SelectItem>
@@ -717,8 +722,9 @@ export default function ListingsPage() {
                                     id="min_price"
                                     name="min_price"
                                     type="number"
+                                    step="0.01"
                                     min="0"
-                                    value={newListing.min_price || ""}
+                                    value={newListing.min_price !== undefined ? newListing.min_price : ""}
                                     onChange={handleInputChange}
                                     required
                                 />

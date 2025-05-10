@@ -61,7 +61,7 @@ export default function MessLayout({
     };
 
     return (
-        <div className="relative p-6 ">
+        <div className="relative">
             <div className="mx-2 ml-13 mb-20">
                 {children}
 
