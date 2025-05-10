@@ -2,12 +2,13 @@
 
 import { useState, useEffect } from "react"
 import { useSession } from "next-auth/react"
-import { useRouter } from "next/navigation" // Add router import
+import { useRouter } from "next/navigation"
 import { supabase } from "@/lib/supabaseClient"
 import { format } from "date-fns"
 import { CalendarDays, ShoppingBag, ReceiptText, TagIcon, Phone, Trash2 } from "lucide-react"
 import { toast } from "sonner"
 import { formatRelativeTime } from "@/lib/utils"
+import QRCode from 'react-qr-code'
 
 import { PageHeading } from "@/components/ui/page-heading"
 import { MessIcon } from "@/components/ui/mess-icon"
@@ -28,7 +29,6 @@ interface Listing {
     seller_name?: string
     buyer_name?: string
     bids?: bid[]
-    status?: string
     transaction?: boolean
 }
 
@@ -84,7 +84,7 @@ interface Transaction {
 }
 
 export default function DashboardPage() {
-    const { data: session, status } = useSession()
+    const { data: session } = useSession()
     const router = useRouter()
     const [soldListings, setSoldListings] = useState<Listing[]>([])
     const [purchasedListings, setPurchasedListings] = useState<Listing[]>([])
@@ -95,7 +95,7 @@ export default function DashboardPage() {
     const [activeTab, setActiveTab] = useState("sold")
 
     useEffect(() => {
-        if (status === "authenticated" && session?.user?.rollNumber) {
+        if (session?.user?.rollNumber) {
             fetchUserListings()
             fetchUserBids()
             fetchTransactionHistory()
@@ -107,7 +107,7 @@ export default function DashboardPage() {
             // Clean up subscriptions on unmount
             supabase.removeAllChannels()
         }
-    }, [status, session])
+    }, [session])
 
     // Set up real-time subscriptions
     const setupRealTimeSubscriptions = () => {
@@ -511,32 +511,6 @@ export default function DashboardPage() {
         }).format(price)
     }
 
-    // Get appropriate status badge color
-    const getStatusColor = (status: string | undefined) => {
-        if (!status) return "bg-emerald-100 text-emerald-800"; // Default to available
-
-        switch (status) {
-            case "available":
-                return "bg-emerald-100 text-emerald-800"
-            case "sold":
-                return "bg-blue-100 text-blue-800"
-            case "cancelled":
-                return "bg-red-100 text-red-800"
-            case "expired":
-                return "bg-amber-100 text-amber-800"
-            default:
-                return "bg-gray-100 text-gray-800"
-        }
-    }
-
-    // Format listing status
-    const formatStatus = (listing: Listing) => {
-        if (listing.status) {
-            return listing.status.charAt(0).toUpperCase() + listing.status.slice(1);
-        }
-        return "Available"; // Default status
-    }
-
     // Delete a listing
     const deleteListing = async (e: React.MouseEvent, listingId: string) => {
         e.stopPropagation(); // Prevent navigating to listing detail page
@@ -628,7 +602,7 @@ export default function DashboardPage() {
                             <p>Loading your listings...</p>
                         </div>
                     ) : soldListings.length > 0 ? (
-                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-6">
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-6">
                             {soldListings.map((listing) => (
                                 <Card
                                     key={listing.id}
@@ -636,7 +610,7 @@ export default function DashboardPage() {
                                     onClick={() => router.push(`/mess/listings/${listing.id}`)}
                                 >
                                     <div className="p-4 relative">
-                                        {listing.status !== "sold" && (
+                                        {!listing.transaction && (
                                             <div className="absolute -top-1 right-4">
                                                 <Button
                                                     variant="noShadow"
@@ -720,11 +694,11 @@ export default function DashboardPage() {
                             <p>Loading your purchases...</p>
                         </div>
                     ) : myPurchases.length > 0 ? (
-                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-6">
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-2 gap-4 md:gap-6">
                             {myPurchases.map((purchase) => (
                                 <Card
                                     key={purchase.id}
-                                    className="overflow-hidden hover:shadow-lg transition-shadow"
+                                    className="overflow-hidden hover:shadow-lg transition-shadow w-full"
                                 >
                                     <div className="p-4 relative">
                                         <div className="absolute top-4 right-4">
@@ -753,21 +727,26 @@ export default function DashboardPage() {
                                             <p>Paid: {formatPrice(purchase.transaction?.sold_price)}</p>
                                         </div>
 
-                                        <div className="mt-3 p-3 bg-blue-50 border border-blue-200">
-                                            <p className="text-sm text-blue-800 mb-2 font-semibold">
-                                                Meal Token:
+                                        <div className="mt-3">
+                                            <p className="text-md mb-2 font-semibold">
+                                                Meal QR:
                                             </p>
-                                            <div className="bg-white p-2 border border-blue-200 overflow-auto">
-                                                <code className="text-xs break-all">{purchase.seller_token}</code>
+                                            <div className="flex justify-center bg-white">
+                                                <QRCode
+                                                    value={purchase.seller_token || ""}
+                                                    size={180}
+                                                    style={{ height: "auto", maxWidth: "100%", width: "100%" }}
+                                                    viewBox={`0 0 256 256`}
+                                                />
                                             </div>
                                         </div>
 
                                         <div className="flex justify-between items-center mt-3 pt-3 border-t border-border/30">
                                             <p className="text-xs text-muted-foreground">
-                                                Purchased {formatRelativeTime(purchase.created_at)}
+                                                Bought {formatRelativeTime(purchase.created_at)}
                                             </p>
                                             <p className="text-sm font-medium">
-                                                Seller: {purchase.transaction?.seller?.name}
+                                                {purchase.transaction?.seller?.name}
                                             </p>
                                         </div>
                                     </div>
@@ -784,8 +763,8 @@ export default function DashboardPage() {
                                 >
                                     <div className="p-4 relative">
                                         <div className="absolute top-4 right-4">
-                                            <span className={`px-2 py-1 rounded-full text-xs font-semibold ${getStatusColor(listing.status)}`}>
-                                                {formatStatus(listing)}
+                                            <span className="px-2 py-1 rounded-full text-xs font-semibold bg-blue-100 text-blue-800">
+                                                Purchase History
                                             </span>
                                         </div>
 
