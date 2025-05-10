@@ -6,6 +6,7 @@ export type NotificationType =
     | 'bid_accepted'
     | 'payment_marked'
     | 'bid_updated'
+    | 'bid_cancelled'
 
 interface NotificationData {
     listingId?: string
@@ -51,38 +52,44 @@ export async function sendNotification(
  */
 export const notificationMessages = {
     // For a seller when a new bid is placed
-    bidPlaced: (price: number, mess: string, meal: string, bidderName: string) => ({
+    bidPlaced: (price: number, mess: string, meal: string, bidderName: string, listingDate: string) => ({
         title: 'New Bid Received',
-        message: `${bidderName} placed a bid of ₹${price} on your ${mess} ${meal} listing.`,
+        message: `${bidderName} placed a bid of ₹${price} on your ${mess} ${meal} for ${listingDate}.`,
     }),
 
     // For a buyer when their bid is accepted
-    bidAccepted: (price: number, mess: string, meal: string, sellerName: string, sellerPhoneNumber: string) => ({
+    bidAccepted: (price: number, mess: string, meal: string, sellerName: string, sellerPhoneNumber: string, listingDate: string) => ({
         title: 'Bid Accepted!',
-        message: `Your bid of ₹${price} for ${mess} ${meal} has been accepted. Please contact ${sellerName} at ${sellerPhoneNumber} to complete the transaction.`,
+        message: `Your bid of ₹${price} for ${mess} ${meal} on ${listingDate} has been accepted. Please contact ${sellerName} at ${sellerPhoneNumber} to complete the transaction.`,
     }),
-    
+
     // For a seller when they accept a bid
-    bidAcceptedSeller: (price: number, mess: string, meal: string, buyerName: string, buyerPhoneNumber: string) => ({
+    bidAcceptedSeller: (price: number, mess: string, meal: string, buyerName: string, buyerPhoneNumber: string, listingDate: string) => ({
         title: 'Bid Accepted',
-        message: `You've accepted ${buyerName}'s bid of ₹${price} for your ${mess} ${meal} listing. You can contact them at ${buyerPhoneNumber}.`,
+        message: `You've accepted ${buyerName}'s bid of ₹${price} for your ${mess} ${meal} on ${listingDate}. You can contact them at ${buyerPhoneNumber}.`,
     }),
 
     // For a buyer when their bid is marked as paid
-    paymentMarked: (price: number, mess: string, meal: string, sellerName: string) => ({
+    paymentMarked: (price: number, mess: string, meal: string, sellerName: string, listingDate: string) => ({
         title: 'Payment Confirmed',
-        message: `Your payment of ₹${price} for ${mess} ${meal} has been confirmed by ${sellerName}.`,
+        message: `Your payment of ₹${price} for ${mess} ${meal} on ${listingDate} has been confirmed by ${sellerName}.`,
     }),
 
     // For a seller when a buyer has paid
-    paymentReceived: (price: number, mess: string, meal: string) => ({
+    paymentReceived: (price: number, mess: string, meal: string, listingDate: string) => ({
         title: 'Payment Received',
-        message: `You've confirmed receiving payment of ₹${price} for your ${mess} ${meal} listing.`,
+        message: `You've confirmed receiving payment of ₹${price} for your ${mess} ${meal} on ${listingDate}.`,
     }),
 
     // For seller when bid is updated
-    bidUpdated: (price: number, mess: string, meal: string) => ({
+    bidUpdated: (price: number, mess: string, meal: string, listingDate: string) => ({
         title: 'Bid Updated',
-        message: `A bid on your ${mess} ${meal} listing has been updated to ₹${price}.`,
+        message: `A bid on your ${mess} ${meal} for ${listingDate} has been updated to ₹${price}.`,
+    }),
+
+    // For buyer when their accepted bid is cancelled
+    bidCancelled: (price: number, mess: string, meal: string, sellerName: string, listingDate: string) => ({
+        title: 'Bid Cancelled',
+        message: `Your bid of ₹${price} for ${meal} at ${mess} on ${listingDate} has been cancelled by ${sellerName}. Do not make a payment.`,
     }),
 }

@@ -5,7 +5,7 @@ import { useSession } from "next-auth/react"
 import { useRouter } from "next/navigation" // Add router import
 import { supabase } from "@/lib/supabaseClient"
 import { format } from "date-fns"
-import { CalendarDays, ShoppingBag, ReceiptText, TagIcon, Phone } from "lucide-react"
+import { CalendarDays, ShoppingBag, ReceiptText, TagIcon, Phone, Trash2 } from "lucide-react"
 import { toast } from "sonner"
 import { formatRelativeTime } from "@/lib/utils"
 
@@ -458,6 +458,63 @@ export default function DashboardPage() {
         return "Available"; // Default status
     }
 
+    // Delete a listing
+    const deleteListing = async (e: React.MouseEvent, listingId: string) => {
+        e.stopPropagation(); // Prevent navigating to listing detail page
+
+        if (!window.confirm("Are you sure you want to delete this listing?")) {
+            return;
+        }
+
+        try {
+            // Delete all bids for this listing first
+            const { error: deleteBidsError } = await supabase
+                .from("bids")
+                .delete()
+                .eq("listing_id", listingId);
+
+            if (deleteBidsError) throw deleteBidsError;
+
+            // Delete the listing
+            const { error: deleteListingError } = await supabase
+                .from("listings")
+                .delete()
+                .eq("id", listingId);
+
+            if (deleteListingError) throw deleteListingError;
+
+            toast.success("Listing deleted successfully");
+            fetchUserListings();
+        } catch (error) {
+            console.error("Error deleting listing:", error);
+            toast.error("Failed to delete listing");
+        }
+    };
+
+    // Delete a bid
+    const deleteBid = async (e: React.MouseEvent, bidId: string) => {
+        e.stopPropagation(); // Prevent navigating to listing detail page
+
+        if (!window.confirm("Are you sure you want to delete this bid?")) {
+            return;
+        }
+
+        try {
+            const { error } = await supabase
+                .from("bids")
+                .delete()
+                .eq("id", bidId);
+
+            if (error) throw error;
+
+            toast.success("Bid deleted successfully");
+            fetchUserBids();
+        } catch (error) {
+            console.error("Error deleting bid:", error);
+            toast.error("Failed to delete bid");
+        }
+    };
+
     return (
         <div className="container mx-auto px-4 py-8">
             <PageHeading title="My Dashboard" />
@@ -500,11 +557,18 @@ export default function DashboardPage() {
                                     onClick={() => router.push(`/mess/listings/${listing.id}`)}
                                 >
                                     <div className="p-4 relative">
-                                        <div className="absolute top-4 right-4">
-                                            <span className={`px-2 py-1 rounded-full text-xs font-semibold ${getStatusColor(listing.status)}`}>
-                                                {formatStatus(listing)}
-                                            </span>
-                                        </div>
+                                        {listing.status !== "sold" && (
+                                            <div className="absolute -top-1 right-4">
+                                                <Button
+                                                    variant="noShadow"
+                                                    size="sm"
+                                                    onClick={(e) => deleteListing(e, listing.id)}
+                                                    className="px-2 py-1 h-auto text-xs"
+                                                >
+                                                    <Trash2 className="h-3 w-3" />
+                                                </Button>
+                                            </div>
+                                        )}
 
                                         <div className="flex items-start mb-3 mt-6">
                                             <div className="flex items-center gap-2">
@@ -653,6 +717,19 @@ export default function DashboardPage() {
                                                 {bid.paid ? "Paid" : bid.accepted ? "Accepted" : "Pending"}
                                             </span>
                                         </div>
+
+                                        {!bid.accepted && !bid.paid && (
+                                            <div className="absolute -top-1 left-4">
+                                                <Button
+                                                    variant="noShadow"
+                                                    size="sm"
+                                                    onClick={(e) => deleteBid(e, bid.id)}
+                                                    className="px-2 py-1 h-auto text-xs"
+                                                >
+                                                    <Trash2 className="h-3 w-3" />
+                                                </Button>
+                                            </div>
+                                        )}
 
                                         <div className="flex items-start mb-3 mt-6">
                                             <div className="flex items-center gap-2">

@@ -359,14 +359,13 @@ export default function ListingDetailPage() {
                     .eq("buyer_roll_number", session.user.rollNumber)
                     .eq("listing_id", id)
 
-                if (error) throw error
-
-                // Send notification to the seller about the updated bid
+                if (error) throw error                // Send notification to the seller about the updated bid
                 if (typeof window !== 'undefined') {
                     // Import dynamically to avoid server-side issues
                     const { sendNotification, notificationMessages } = await import('@/lib/notifications')
 
-                    const notif = notificationMessages.bidUpdated(bidValue, listing.mess, listing.meal)
+                    const listingDate = formatDate(listing.date);
+                    const notif = notificationMessages.bidUpdated(bidValue, listing.mess, listing.meal, listingDate)
 
                     await sendNotification(
                         listing.seller_id,
@@ -394,14 +393,13 @@ export default function ListingDetailPage() {
                         bid_price: bidValue
                     })
 
-                if (error) throw error
-
-                // Send notification to the seller about the new bid
+                if (error) throw error                // Send notification to the seller about the new bid
                 if (typeof window !== 'undefined') {
                     // Import dynamically to avoid server-side issues
                     const { sendNotification, notificationMessages } = await import('@/lib/notifications')
 
-                    const notif = notificationMessages.bidPlaced(bidValue, listing.mess, listing.meal, session.user.name || "A bidder")
+                    const listingDate = formatDate(listing.date);
+                    const notif = notificationMessages.bidPlaced(bidValue, listing.mess, listing.meal, session.user.name || "A bidder", listingDate)
 
                     await sendNotification(
                         listing.seller_id,
@@ -477,6 +475,7 @@ export default function ListingDetailPage() {
 
                 const sellerName = listing.seller.name;
                 const sellerPhoneNumber = listing.seller.phone_number || "N/A";
+                const listingDate = formatDate(listing.date);
 
                 // Find the buyer data for the notification
                 const buyerData = bids.find(b => b.id === bidId)?.buyer;
@@ -484,7 +483,7 @@ export default function ListingDetailPage() {
                 const buyerPhoneNumber = buyerData?.phone_number || "N/A";
 
                 // Send notification to buyer
-                const notif = notificationMessages.bidAccepted(bidPrice, listing.mess, listing.meal, sellerName, sellerPhoneNumber)
+                const notif = notificationMessages.bidAccepted(bidPrice, listing.mess, listing.meal, sellerName, sellerPhoneNumber, listingDate)
                 await sendNotification(
                     buyerRollNumber,
                     'bid_accepted',
@@ -502,7 +501,7 @@ export default function ListingDetailPage() {
                 )
 
                 // Also send notification to seller with buyer's contact info
-                const sellerNotif = notificationMessages.bidAcceptedSeller(bidPrice, listing.mess, listing.meal, buyerName, buyerPhoneNumber)
+                const sellerNotif = notificationMessages.bidAcceptedSeller(bidPrice, listing.mess, listing.meal, buyerName, buyerPhoneNumber, listingDate)
                 await sendNotification(
                     listing.seller_id,
                     'bid_accepted',
@@ -582,7 +581,8 @@ export default function ListingDetailPage() {
                 const { sendNotification, notificationMessages } = await import('@/lib/notifications')
 
                 const sellerName = listing.seller.name;
-                const buyerNotif = notificationMessages.paymentMarked(bidPrice, listing.mess, listing.meal, sellerName)
+                const listingDate = formatDate(listing.date);
+                const buyerNotif = notificationMessages.paymentMarked(bidPrice, listing.mess, listing.meal, sellerName, listingDate)
                 await sendNotification(
                     buyerRollNumber,
                     'payment_marked',
@@ -600,7 +600,7 @@ export default function ListingDetailPage() {
                 )
 
                 // Also notify the seller (self-notification for record keeping)
-                const sellerNotif = notificationMessages.paymentReceived(bidPrice, listing.mess, listing.meal)
+                const sellerNotif = notificationMessages.paymentReceived(bidPrice, listing.mess, listing.meal, listingDate)
                 await sendNotification(
                     listing.seller_id,
                     'payment_marked', // Should this be 'payment_received' type? The message is paymentReceived.
@@ -685,15 +685,10 @@ export default function ListingDetailPage() {
                 const { sendNotification, notificationMessages } = await import('@/lib/notifications')
 
                 const sellerName = listing.seller.name;
+                const listingDate = formatDate(listing.date);
 
-                // Create a notification for bid cancellation (you may need to add this to your notification messages)
-                const notif = {
-                    title: "Bid Cancelled",
-                    message: `Your bid of ₹${bidPrice} for ${listing.meal} at ${listing.mess} has been cancelled by the seller. You don't need to make payment.`
-                };
-
-                // If you have this in your notification messages, use it instead
-                // const notif = notificationMessages.bidCancelled(bidPrice, listing.mess, listing.meal, sellerName);
+                // Use the proper notification message from notificationMessages
+                const notif = notificationMessages.bidCancelled(bidPrice, listing.mess, listing.meal, sellerName, listingDate);
 
                 await sendNotification(
                     buyerRollNumber,
@@ -716,7 +711,7 @@ export default function ListingDetailPage() {
             setShowUnmarkBidConfirmation(false)
             setBidToUnmark(null)
 
-            toast.success("Bid cancelled and deleted successfully")
+            toast.success(`Bid cancelled for ${listing.meal} at ${listing.mess} successfully`)
             fetchBids() // Refresh the bids list
         } catch (error) {
             console.error("Error deleting bid:", error)
@@ -958,7 +953,7 @@ export default function ListingDetailPage() {
                                                                 setBidToUnmark(bid.id);
                                                                 setShowUnmarkBidConfirmation(true);
                                                             }}
-                                                            variant="outline"
+                                                            variant="neutral"
                                                             size="sm"
                                                             disabled={completingTransaction}
                                                         >
