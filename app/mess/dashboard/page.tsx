@@ -570,7 +570,7 @@ export default function DashboardPage() {
 
     return (
         <div className="container mx-auto px-4 py-8">
-            <PageHeading title="My Dashboard" />
+            <PageHeading title="My Dashboard" subtitle="If you're looking for it, it's most probably here" />
 
             <Tabs defaultValue="sold" className="w-full" onValueChange={setActiveTab}>
                 <TabsList className="grid w-full grid-cols-4 mb-4 md:mb-8">

@@ -128,9 +128,9 @@ export default function ProfilePage() {
     }
 
     return (
-        <div className="container mx-auto px-2 sm:px-2 py-8">
+        <div className="container mx-auto p-6 sm:px-2 py-8">
             <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-8">
-                <PageHeading title="My Profile" />
+                <PageHeading title="My Profile" subtitle="There's more to you than is written here" />
                 {profile && (
                     <div className="flex justify-end">
                         {!editing ? (

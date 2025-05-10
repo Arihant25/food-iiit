@@ -831,7 +831,13 @@ export default function ListingDetailPage() {
                 </Button>
             </div>
 
-            <PageHeading title="Listing Details" />
+            <PageHeading 
+                title="Listing Details" 
+                subtitle={session?.user?.rollNumber === listing?.seller_id 
+                    ? "Someday you'll find the one (buyer)" 
+                    : "Bid higher, it always works"
+                } 
+            />
 
             {loading ? (
                 <div className="flex justify-center items-center h-64">

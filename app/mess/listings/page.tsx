@@ -498,7 +498,7 @@ export default function ListingsPage() {
 
     return (
         <div className="container mx-auto px-4 py-6">
-            <PageHeading title="Meal Listings" />
+            <PageHeading title="Meal Listings" subtitle="Your next meal could be right here" />
             {/* Search and Filter Controls */}
             <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
                 <div className="flex-1 relative min-w-[200px] w-full sm:w-auto">

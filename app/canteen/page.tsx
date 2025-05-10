@@ -13,6 +13,7 @@ import { ArrowDownAZ, ArrowUpZA, CheckIcon, ChevronsUpDown, SortAsc, Leaf, Drums
 import { Button } from "@/components/ui/button";
 import { useSession } from "next-auth/react";
 import { toast } from "sonner";
+import { PageHeading } from "@/components/ui/page-heading";
 import {
   Command,
   CommandEmpty,
@@ -475,20 +476,16 @@ export default function CanteenPage() {
 
           {selectedCanteen && (
             <div className="flex flex-col items-center mt-4 sm:mt-6 mb-8 sm:mb-12">
-              <div className="border-4 border-black shadow-shadow bg-main text-main-foreground p-4 w-full max-w-md rounded-lg transform rotate-1">
-                <h1 className="text-4xl sm:text-5xl font-heading text-center mb-4">{selectedCanteen.name}</h1>
-
-                {selectedCanteen.timings && (
-                  <div className="flex flex-col items-center">
-                    <p className="text-base sm:text-lg font-base mb-2">Hours: {selectedCanteen.timings}</p>
-                    {isCanteenOpen(selectedCanteen.timings) ? (
-                      <p className="text-lg sm:text-xl font-heading px-3 py-1 bg-secondary-background rounded-md border-2 border-black">OPEN NOW</p>
-                    ) : (
-                      <p className="text-lg sm:text-xl font-heading px-3 py-1 bg-background rounded-md border-2 border-black">CLOSED</p>
-                    )}
-                  </div>
-                )}
-              </div>
+              <PageHeading
+                title={selectedCanteen.name}
+                subtitle={selectedCanteen.timings ? `Hours: ${selectedCanteen.timings}` : undefined}
+                status={selectedCanteen.timings ?
+                  {
+                    text: isCanteenOpen(selectedCanteen.timings) ? "OPEN NOW" : "CLOSED",
+                    isActive: isCanteenOpen(selectedCanteen.timings)
+                  } : undefined
+                }
+              />
 
               {/* Filters Section */}
               <div className="flex flex-col mt-6 sm:mt-8 mb-4 w-full max-w-4xl mx-auto bg-secondary-background rounded-lg p-3 sm:p-6 border-2 border-border">

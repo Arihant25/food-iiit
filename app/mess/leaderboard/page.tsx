@@ -24,10 +24,7 @@ export default function LeaderboardPage() {
     useEffect(() => {
         async function fetchLeaderboardData() {
             setIsLoading(true)
-            try {
-                // Log the current user ID for debugging
-                console.log("Current user ID from session:", currentUserId)
-                
+            try {                
                 // Fetch seller data from transaction_history
                 const { data: sellerData, error: sellerError } = await supabase
                     .from("transaction_history")
@@ -58,7 +55,6 @@ export default function LeaderboardPage() {
                 const processedSellerData = Array.from(sellerMap.values())
                     .sort((a, b) => b.count - a.count)
                 
-                console.log('Processed seller data:', processedSellerData)
                 setSellerStats(processedSellerData)
 
                 // Fetch buyer data from transaction_history
