@@ -25,12 +25,18 @@ export default function LeaderboardPage() {
         async function fetchLeaderboardData() {
             setIsLoading(true)
             try {
+                // Type for the returned data
+                type SellerDataItem = {
+                    seller_id: string;
+                    users: { name: string };
+                }
+
                 // Fetch seller data from transaction_history
                 const { data: sellerData, error: sellerError } = await supabase
                     .from("transaction_history")
                     .select(`
             seller_id,
-            users!transaction_history_seller_id_fkey (name)
+            users:users!transaction_history_seller_id_fkey (name)
           `)
 
                 if (sellerError) {
@@ -42,7 +48,9 @@ export default function LeaderboardPage() {
                 const sellerMap = new Map<string, { id: string; name: string; count: number }>()
                 sellerData.forEach((item) => {
                     const sellerId = item.seller_id
-                    const sellerName = item.users && item.users[0] && item.users[0].name || "Unknown"
+                    // Type assertion to help TypeScript understand the structure
+                    const users = item.users as unknown as { name: string }
+                    const sellerName = users?.name || "Unknown"
 
                     if (sellerMap.has(sellerId)) {
                         sellerMap.get(sellerId)!.count += 1
@@ -62,7 +70,7 @@ export default function LeaderboardPage() {
                     .from("transaction_history")
                     .select(`
             buyer_id,
-            users!transaction_history_buyer_id_fkey (name)
+            users:users!transaction_history_buyer_id_fkey (name)
           `)
 
                 if (buyerError) {
@@ -74,8 +82,9 @@ export default function LeaderboardPage() {
                 const buyerMap = new Map<string, { id: string; name: string; count: number }>()
                 buyerData.forEach((item) => {
                     const buyerId = item.buyer_id
-                    const buyerName = item.users?.name || "Unknown"
-
+                    // Type assertion to help TypeScript understand the structure
+                    const users = item.users as unknown as { name: string }
+                    const buyerName = users?.name || "Unknown"
 
                     if (buyerMap.has(buyerId)) {
                         buyerMap.get(buyerId)!.count += 1

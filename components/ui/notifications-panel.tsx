@@ -3,6 +3,7 @@
 import React, { useState, useEffect } from "react"
 import { supabase } from "@/lib/supabaseClient"
 import { useSession } from "next-auth/react"
+import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { cn, formatRelativeTime } from "@/lib/utils"
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card"
@@ -21,6 +22,7 @@ export default function NotificationsPanel() {
     const { data: session } = useSession()
     const [notifications, setNotifications] = useState<Notification[]>([])
     const [unreadCount, setUnreadCount] = useState(0)
+    const router = useRouter()
 
     // Fetch notifications
     useEffect(() => {
@@ -158,8 +160,16 @@ export default function NotificationsPanel() {
                                     key={notification.id}
                                     className={cn(
                                         "py-3 hover:bg-main/5 rounded-md transition-colors",
-                                        !notification.read && "bg-main/10"
+                                        !notification.read && "bg-main/10",
+                                        notification.type === 'payment_marked' && "cursor-pointer hover:shadow-sm"
                                     )}
+                                    onClick={() => {
+                                        // Navigate to purchases tab for payment_marked notifications
+                                        if (notification.type === 'payment_marked') {
+                                            router.push('/mess/dashboard?tab=purchased');
+                                            markAsRead(notification.id);
+                                        }
+                                    }}
                                 >
                                     <div className="flex justify-between items-start">
                                         <h4 className="font-semibold text-sm">{notification.title}</h4>
@@ -167,7 +177,12 @@ export default function NotificationsPanel() {
                                             {formatRelativeTime(notification.created_at)}
                                         </span>
                                     </div>
-                                    <p className="text-sm mt-1">{notification.message}</p>
+                                    <p className="text-sm mt-1">
+                                        {notification.message}
+                                        {notification.type === 'payment_marked' && (
+                                            <span className="ml-1">Tap to view QR.</span>
+                                        )}
+                                    </p>
                                 </div>
                             ))}
                         </div>

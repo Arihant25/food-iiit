@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react"
 import { useSession } from "next-auth/react"
-import { useRouter } from "next/navigation"
+import { useRouter, useSearchParams } from "next/navigation"
 import { supabase } from "@/lib/supabaseClient"
 import { format } from "date-fns"
 import { CalendarDays, ShoppingBag, ReceiptText, TagIcon, Phone, Trash2 } from "lucide-react"
@@ -86,13 +86,18 @@ interface Transaction {
 export default function DashboardPage() {
     const { data: session } = useSession()
     const router = useRouter()
+    const searchParams = useSearchParams()
     const [soldListings, setSoldListings] = useState<Listing[]>([])
     const [purchasedListings, setPurchasedListings] = useState<Listing[]>([])
     const [myBids, setMyBids] = useState<bid[]>([])
     const [transactions, setTransactions] = useState<Transaction[]>([])
     const [myPurchases, setMyPurchases] = useState<Purchase[]>([])
     const [loading, setLoading] = useState(true)
-    const [activeTab, setActiveTab] = useState("sold")
+    const [activeTab, setActiveTab] = useState(() => {
+        // Get the tab query parameter, default to "sold" if not present
+        const tabParam = searchParams.get("tab")
+        return tabParam && ["sold", "purchased", "bids", "history"].includes(tabParam) ? tabParam : "sold"
+    })
 
     useEffect(() => {
         if (session?.user?.rollNumber) {
@@ -568,11 +573,20 @@ export default function DashboardPage() {
         }
     };
 
+    // Function to handle tab change and update URL
+    const handleTabChange = (value: string) => {
+        setActiveTab(value)
+        // Update URL without refreshing the page
+        const url = new URL(window.location.href)
+        url.searchParams.set("tab", value)
+        window.history.pushState({}, "", url.toString())
+    }
+
     return (
         <div className="container mx-auto px-4 py-8">
             <PageHeading title="My Dashboard" subtitle="If you're looking for it, it's most probably here" />
 
-            <Tabs defaultValue="sold" className="w-full" onValueChange={setActiveTab}>
+            <Tabs defaultValue={activeTab} className="w-full" onValueChange={handleTabChange}>
                 <TabsList className="grid w-full grid-cols-4 mb-4 md:mb-8">
                     <TabsTrigger value="sold" className="flex items-center justify-center text-xs sm:text-sm">
                         <ReceiptText className="h-3 w-3 sm:h-4 sm:w-4 mr-1 sm:mr-2 hidden sm:inline" />
@@ -698,7 +712,7 @@ export default function DashboardPage() {
                             {myPurchases.map((purchase) => (
                                 <Card
                                     key={purchase.id}
-                                    className="overflow-hidden hover:shadow-lg transition-shadow w-full"
+                                    className="overflow-hidden w-full"
                                 >
                                     <div className="p-4 relative">
                                         <div className="absolute top-4 right-4">

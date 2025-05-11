@@ -72,7 +72,7 @@ export const notificationMessages = {
     // For a buyer when their bid is marked as paid
     paymentMarked: (price: number, mess: string, meal: string, sellerName: string, listingDate: string) => ({
         title: 'Payment Confirmed',
-        message: `Your payment of ₹${price} for ${mess} ${meal} on ${listingDate} has been confirmed by ${sellerName}.`,
+        message: `Your payment of ₹${price} for ${mess} ${meal} on ${listingDate} has been confirmed by ${sellerName}. Click here to see the QR.`,
     }),
 
     // For a seller when a buyer has paid

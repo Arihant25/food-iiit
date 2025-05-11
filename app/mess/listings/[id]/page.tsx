@@ -30,7 +30,6 @@ interface Listing {
     mess: string
     seller_id: string
     created_at: string
-    buyer_id?: string  // Add this optional property
     seller: {
         name: string
         email: string
@@ -185,11 +184,19 @@ export default function ListingDetailPage() {
 
                         // If the user is not the seller or buyer, redirect to listings
                         if (session?.user?.rollNumber) {
-                            if (listing?.buyer_id === session.user.rollNumber) {
+                            // Check if this user is the buyer from our session storage
+                            const buyerId = typeof window !== 'undefined' ?
+                                sessionStorage.getItem(`listing_${id}_buyer`) : null;
+
+                            if (buyerId === session.user.rollNumber) {
                                 // Redirect buyer to My Purchases
                                 toast.success("The listing has been marked as paid. Redirecting to My Purchases...")
                                 router.push("/mess/dashboard?tab=purchases")
-                            } else if (session.user.rollNumber !== listing?.seller_id) {
+                            } else if (session.user.rollNumber === listing?.seller_id) {
+                                // Redirect seller to transaction history
+                                toast.success("Payment confirmed and transaction completed.")
+                                router.push("/mess/dashboard?tab=history")
+                            } else {
                                 // Redirect anyone else to listings
                                 toast.info("This listing has been sold and is no longer available.")
                                 router.push("/mess/listings")
@@ -753,14 +760,12 @@ export default function ListingDetailPage() {
                 )
             }
 
-            // Update the listing with the buyer_id before deleting it
-            // This helps the real-time listener identify the buyer
-            const { error: updateListingError } = await supabase
-                .from("listings")
-                .update({ buyer_id: buyerRollNumber })
-                .eq("id", id)
-
-            if (updateListingError) throw updateListingError
+            // Store the buyer information for listener identification
+            // We'll use session storage instead of updating a non-existent column
+            if (typeof window !== 'undefined') {
+                // Store the buyer ID temporarily to help the real-time listener identify the buyer
+                sessionStorage.setItem(`listing_${id}_buyer`, buyerRollNumber);
+            }
 
             // Delete all bids for this listing
             const { error: deleteBidsError } = await supabase
@@ -780,9 +785,13 @@ export default function ListingDetailPage() {
 
             toast.success("Payment confirmed and transaction completed successfully")
 
-            // Redirect to dashboard since this listing is now deleted
+            // Redirect to dashboard with appropriate tab
             if (session?.user?.rollNumber === listing.seller_id) {
-                router.push("/mess/dashboard")
+                // Seller is redirected to the history tab
+                router.push("/mess/dashboard?tab=history")
+            } else if (session?.user?.rollNumber === buyerRollNumber) {
+                // Buyer is redirected to the purchases tab
+                router.push("/mess/dashboard?tab=purchases")
             }
         } catch (error) {
             console.error("Error marking bid as paid:", error)
@@ -1173,7 +1182,7 @@ export default function ListingDetailPage() {
                     </Card>
 
                     {/* Display bids section */}
-                    {!listing.buyer_id && (
+                    {bids && bids.length > 0 && !bids.some(bid => bid.paid) && (
                         <Card className="md:col-span-1">
                             <CardHeader>
                                 <CardTitle className="text-xl font-bold">Bids ({bids.length})</CardTitle>

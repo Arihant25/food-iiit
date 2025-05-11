@@ -666,8 +666,17 @@ export default function ListingsPage() {
                     {filteredListings.map((listing) => (
                         <Card
                             key={listing.id}
-                            className="overflow-hidden cursor-pointer hover:shadow-lg transition-shadow"
+                            className="overflow-hidden cursor-pointer hover:shadow-lg transition-shadow focus:outline-2 focus:outline-primary focus:outline focus-visible:outline-2 focus-visible:outline-primary focus-visible:outline"
                             onClick={() => router.push(`/mess/listings/${listing.id}`)}
+                            tabIndex={0}
+                            role="button"
+                            aria-label={`View details for ${listing.mess} ${listing.meal} on ${formatDate(listing.date)}`}
+                            onKeyDown={(e) => {
+                                if (e.key === 'Enter' || e.key === ' ') {
+                                    e.preventDefault();
+                                    router.push(`/mess/listings/${listing.id}`);
+                                }
+                            }}
                         >
                             <div className="p-5">
                                 {/* Mess name and price row */}
