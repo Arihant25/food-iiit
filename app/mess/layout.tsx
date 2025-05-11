@@ -56,7 +56,12 @@ export default function MessLayout({
 
     // Handle avatar click to navigate to the corresponding page
     const handleAvatarClick = (item: { id: string; name: string; image?: string | null }) => {
-        router.push(`/mess/${item.id}`);
+        // If the clicked item is already selected (current path), redirect to the main mess page
+        if (item.id === currentPath) {
+            router.push('/mess');
+        } else {
+            router.push(`/mess/${item.id}`);
+        }
     };
 
     return (

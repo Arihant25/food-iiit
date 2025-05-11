@@ -7,7 +7,6 @@ import Marquee from "@/components/ui/marquee"
 import { useSession } from "next-auth/react";
 import { useRouter, usePathname } from "next/navigation";
 import { useEffect } from "react";
-import { PageHeading } from "@/components/ui/page-heading"
 
 export default function MessPage() {
     const router = useRouter();
@@ -50,7 +49,12 @@ export default function MessPage() {
 
     // Handle avatar click to navigate to the corresponding page
     const handleAvatarClick = (item: { id: string; name: string; image?: string | null }) => {
-        router.push(`/mess/${item.id}`);
+        // If the clicked item is already selected (current path), redirect to the main mess page
+        if (item.id === currentPath) {
+            router.push('/mess');
+        } else {
+            router.push(`/mess/${item.id}`);
+        }
     };
 
     const messes = [
@@ -75,7 +79,16 @@ export default function MessPage() {
     return (
         <div className="px-6 py-4 flex flex-col justify-center min-h-screen">
 
-            <PageHeading title="WHAT'S COOKING?" />
+            <div className="text-3xl sm:text-5xl font-bold p-2 sm:p-4 border-4 mb-6 border-black bg-chart-1 text-main-foreground transform rotate-1 text-center max-w-md relative overflow-hidden mx-auto self-center"
+                style={{
+                    backgroundImage: `radial-gradient(circle, rgba(0, 0, 0, 0.2) 1px, transparent 1px)`,
+                    backgroundSize: `12px 12px`,
+                    backgroundPosition: 'center',
+                }}>
+                <div className="relative z-10">
+                    WHAT'S COOKING?
+                </div>
+            </div>
 
             <Marquee items={[...messes].sort(() => 0.5 - Math.random()).map(canteen => canteen.name.toUpperCase())} />
 

@@ -342,6 +342,12 @@ export default function CanteenPage() {
   }
 
   const handleCanteenClick = (item: AvatarItem) => {
+    // If the clicked item is already selected, reset to canteen selection view
+    if (item.id === selectedCanteen?.id) {
+      setSelectedCanteen(null);
+      return;
+    }
+
     // Find the full canteen data from our canteens array using the id from the avatar click
     const fullCanteenData = canteens.find(c => c.id === item.id);
 
