@@ -13,7 +13,7 @@ export function MessIcon({ messName, className = "", size = 20 }: MessIconProps)
 
     if (normalizedName.includes('north')) {
         return <Wheat className={`text-orange-500 ${className}`} size={size} />;
-    } else if (normalizedName.includes('so-uth')) {
+    } else if (normalizedName.includes('south')) {
         return <Coffee className={`text-yellow-600 ${className}`} size={size} />;
     } else if (normalizedName.includes('yuktahar')) {
         return <Leaf className={`text-green-600 ${className}`} size={size} />;

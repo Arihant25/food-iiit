@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
-import { useSession } from "next-auth/react"
+import { useSession, signOut } from "next-auth/react"
 import { supabase } from "@/lib/supabaseClient"
 import { toast } from "sonner"
 import { formatRelativeTime, formatJoinDate } from "@/lib/utils"
@@ -11,7 +11,7 @@ import { PageHeading } from "@/components/ui/page-heading"
 import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import { Pencil, Save, User, Key, Phone, Mail, Calendar, Clock, IdCard } from "lucide-react"
+import { Pencil, Save, User, Key, Phone, Mail, Calendar, Clock, IdCard, LogOut } from "lucide-react"
 
 interface UserProfile {
     id: string
@@ -132,12 +132,22 @@ export default function ProfilePage() {
             <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-8">
                 <PageHeading title="My Profile" subtitle="There's more to you than is written here" />
                 {profile && (
-                    <div className="flex justify-end">
+                    <div className="flex gap-2 justify-end">
                         {!editing ? (
-                            <Button onClick={() => setEditing(true)} size="sm">
-                                <Pencil className="h-4 w-4 mr-2" />
-                                Edit Profile
-                            </Button>
+                            <>
+                                <Button onClick={() => setEditing(true)} size="sm">
+                                    <Pencil className="h-4 w-4 mr-2" />
+                                    Edit Profile
+                                </Button>
+                                <Button 
+                                    onClick={() => signOut({ callbackUrl: '/' })} 
+                                    size="sm" 
+                                    variant="noShadow"
+                                >
+                                    <LogOut className="h-4 w-4 mr-2" />
+                                    Logout
+                                </Button>
+                            </>
                         ) : (
                             <Button onClick={() => setEditing(false)} size="sm" variant="noShadow">
                                 Cancel
@@ -255,6 +265,17 @@ export default function ProfilePage() {
                             {isSaving ? "Saving..." : "Save Changes"}
                         </Button>
                     )}
+
+                    {/* Logout Button */}
+                    <Button
+                        onClick={() => signOut({ callbackUrl: '/' })}
+                        className="w-full mt-6"
+                        size="lg"
+                        variant="noShadow"
+                    >
+                        <LogOut className="h-4 w-4 mr-2" />
+                        Logout
+                    </Button>
                 </div>
             ) : (
                 <div className="flex justify-center items-center h-64">
