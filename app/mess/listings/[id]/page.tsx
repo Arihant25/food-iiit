@@ -167,6 +167,49 @@ export default function ListingDetailPage() {
         }
     }, [id])
 
+    // Include a real-time listener for listing deletion
+    useEffect(() => {
+        if (id) {
+            // Set up real-time subscription for the current listing
+            const listingDeletionChannel = supabase
+                .channel(`listing-deleted-${id}`)
+                .on('postgres_changes',
+                    {
+                        event: 'DELETE',
+                        schema: 'public',
+                        table: 'listings',
+                        filter: `id=eq.${id}`
+                    },
+                    (payload) => {
+                        console.log('Listing deleted:', payload)
+
+                        // If the user is not the seller or buyer, redirect to listings
+                        if (session?.user?.rollNumber) {
+                            if (listing?.buyer_id === session.user.rollNumber) {
+                                // Redirect buyer to My Purchases
+                                toast.success("The listing has been marked as paid. Redirecting to My Purchases...")
+                                router.push("/mess/dashboard?tab=purchases")
+                            } else if (session.user.rollNumber !== listing?.seller_id) {
+                                // Redirect anyone else to listings
+                                toast.info("This listing has been sold and is no longer available.")
+                                router.push("/mess/listings")
+                            }
+                        } else {
+                            // Redirect non-logged in users
+                            toast.info("This listing has been sold and is no longer available.")
+                            router.push("/mess/listings")
+                        }
+                    }
+                )
+                .subscribe()
+
+            // Clean up subscription on unmount
+            return () => {
+                supabase.removeChannel(listingDeletionChannel)
+            }
+        }
+    }, [id, session, listing, router])
+
     // Check if current user has an existing bid on this listing
     useEffect(() => {
         if (session?.user?.rollNumber && bids.length > 0) {
@@ -337,6 +380,11 @@ export default function ListingDetailPage() {
     }
 
     const handleBid = async () => {
+        // Haptic feedback
+        if (typeof navigator !== 'undefined' && 'vibrate' in navigator) {
+            navigator.vibrate(50);
+        }
+
         if (!session?.user) {
             toast.error("You must be logged in to place a bid")
             return
@@ -588,6 +636,11 @@ export default function ListingDetailPage() {
 
     // Mark a bid as paid (seller only)
     const markBidAsPaid = async (bidId: string, bidPrice: number, buyerRollNumber: string) => {
+        // Haptic feedback
+        if (typeof navigator !== 'undefined' && 'vibrate' in navigator) {
+            navigator.vibrate(50);
+        }
+
         if (!session?.user || session.user.rollNumber !== listing?.seller_id) {
             toast.error("Only the seller can mark a bid as paid")
             return
@@ -700,6 +753,15 @@ export default function ListingDetailPage() {
                 )
             }
 
+            // Update the listing with the buyer_id before deleting it
+            // This helps the real-time listener identify the buyer
+            const { error: updateListingError } = await supabase
+                .from("listings")
+                .update({ buyer_id: buyerRollNumber })
+                .eq("id", id)
+
+            if (updateListingError) throw updateListingError
+
             // Delete all bids for this listing
             const { error: deleteBidsError } = await supabase
                 .from("bids")
@@ -717,8 +779,11 @@ export default function ListingDetailPage() {
             if (deleteListingError) throw deleteListingError
 
             toast.success("Payment confirmed and transaction completed successfully")
+
             // Redirect to dashboard since this listing is now deleted
-            router.push("/mess/dashboard")
+            if (session?.user?.rollNumber === listing.seller_id) {
+                router.push("/mess/dashboard")
+            }
         } catch (error) {
             console.error("Error marking bid as paid:", error)
             toast.error("Failed to mark bid as paid")
@@ -1116,8 +1181,8 @@ export default function ListingDetailPage() {
                             <CardContent className={`${bids.length > 0 ? "p-0 divide-y" : "p-4"}`}>
                                 {bids.length > 0 ? (
                                     bids.map((bid) => (
-                                        <div key={bid.id} className={`p-4 flex justify-between items-center ${bid.accepted ? "bg-emerald-50" : ""}`}>
-                                            <div>
+                                        <div key={bid.id} className={`p-4 flex flex-col sm:flex-row justify-between ${bid.accepted ? "bg-emerald-50" : ""}`}>
+                                            <div className="mb-3 sm:mb-0">
                                                 <p className="font-medium">{bid.buyer?.name}</p>
                                                 <p className="text-xl font-bold">
                                                     {new Intl.NumberFormat('en-IN', {
@@ -1144,13 +1209,14 @@ export default function ListingDetailPage() {
                                                 )}
                                             </div>
                                             {session?.user?.rollNumber === listing.seller_id && (
-                                                <div className="flex gap-2">
+                                                <div className="flex flex-wrap gap-2">
                                                     {bid.accepted ? (
                                                         <>
                                                             <Button
                                                                 onClick={() => markBidAsPaid(bid.id, bid.bid_price, bid.buyer_roll_number)}
                                                                 variant="noShadow"
-                                                                className="bg-emerald-100 border-emerald-800 text-emerald-800"
+                                                                size="sm"
+                                                                className="bg-emerald-100 border-emerald-800 text-emerald-800 w-full sm:w-auto"
                                                                 disabled={bid.paid || completingTransaction}
                                                             >
                                                                 {bid.paid ? "Paid" : "Mark as Paid"}
@@ -1162,6 +1228,7 @@ export default function ListingDetailPage() {
                                                                 }}
                                                                 variant="neutral"
                                                                 size="sm"
+                                                                className="w-full sm:w-auto"
                                                                 disabled={completingTransaction}
                                                             >
                                                                 Cancel Bid
@@ -1170,6 +1237,8 @@ export default function ListingDetailPage() {
                                                     ) : (
                                                         <Button
                                                             onClick={() => acceptBid(bid.id, bid.bid_price, bid.buyer_roll_number)}
+                                                            size="sm"
+                                                            className="w-full sm:w-auto"
                                                             disabled={completingTransaction || bids.some(b => b.accepted)}
                                                             title={bids.some(b => b.accepted) ? "Another bid is already accepted" : "Accept this bid"}
                                                         >

@@ -74,7 +74,8 @@ export default function LeaderboardPage() {
                 const buyerMap = new Map<string, { id: string; name: string; count: number }>()
                 buyerData.forEach((item) => {
                     const buyerId = item.buyer_id
-                    const buyerName = item.users && item.users[0] && item.users[0].name || "Unknown"
+                    const buyerName = item.users?.name || "Unknown"
+
 
                     if (buyerMap.has(buyerId)) {
                         buyerMap.get(buyerId)!.count += 1

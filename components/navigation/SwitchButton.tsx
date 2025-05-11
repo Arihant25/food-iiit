@@ -24,6 +24,11 @@ export default function SwitchButton() {
     const handleSwitchClick = (e: React.MouseEvent<HTMLButtonElement>) => {
         e.preventDefault();
 
+        // Haptic feedback
+        if (typeof navigator !== 'undefined' && 'vibrate' in navigator) {
+            navigator.vibrate(50);
+        }
+
         // Set exiting state to trigger exit animation
         setIsExiting(true);
 
