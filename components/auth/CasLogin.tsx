@@ -31,8 +31,6 @@ export default function CasLogin() {
             })
             .then((result) => {
                 if (result?.error) {
-                    console.error("Authentication error:", result.error);
-                    setError(`Authentication failed: ${result.error}`);
                     setIsLoading(false);
                 } else if (result?.ok) {
                     // Successfully authenticated, redirect to mess page
@@ -40,8 +38,6 @@ export default function CasLogin() {
                 }
             })
             .catch((err) => {
-                console.error("Authentication error:", err);
-                setError("Authentication failed. Please try again.");
                 setIsLoading(false);
             });
         }

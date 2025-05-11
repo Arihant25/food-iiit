@@ -115,7 +115,6 @@ const handler = NextAuth({
                         rollNumber: rollNo,
                     };
                 } catch (error) {
-                    console.error("CAS Authentication Error:", error);
                     return null;
                 }
             },

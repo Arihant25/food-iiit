@@ -135,21 +135,21 @@ export default function ProfilePage() {
                     <div className="flex gap-2 justify-end">
                         {!editing ? (
                             <>
-                                <Button onClick={() => setEditing(true)} size="sm">
+                                <Button onClick={() => setEditing(true)} size="sm" variant="neutral">
                                     <Pencil className="h-4 w-4 mr-2" />
                                     Edit Profile
                                 </Button>
                                 <Button
                                     onClick={() => signOut({ callbackUrl: '/' })}
                                     size="sm"
-                                    variant="noShadow"
+                                    variant="default"
                                 >
                                     <LogOut className="h-4 w-4 mr-2" />
                                     Logout
                                 </Button>
                             </>
                         ) : (
-                            <Button onClick={() => setEditing(false)} size="sm" variant="noShadow">
+                            <Button onClick={() => setEditing(false)} size="sm" variant="neutral">
                                 Cancel
                             </Button>
                         )}
@@ -265,17 +265,6 @@ export default function ProfilePage() {
                             {isSaving ? "Saving..." : "Save Changes"}
                         </Button>
                     )}
-
-                    {/* Logout Button */}
-                    <Button
-                        onClick={() => signOut({ callbackUrl: '/' })}
-                        className="w-full mt-6"
-                        size="lg"
-                        variant="noShadow"
-                    >
-                        <LogOut className="h-4 w-4 mr-2" />
-                        Logout
-                    </Button>
                 </div>
             ) : (
                 <div className="flex justify-center items-center h-64">
