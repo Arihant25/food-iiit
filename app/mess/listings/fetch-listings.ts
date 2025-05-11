@@ -1,6 +1,38 @@
 import { supabase } from "@/lib/supabaseClient";
 import { toast } from "sonner";
 
+// Helper to determine if a meal has expired based on its date and type
+export function isMealExpired(mealDate: string, mealType: string): boolean {
+    const now = new Date();
+    const today = now.toISOString().split('T')[0]; // YYYY-MM-DD format
+
+    // If the date is in the past, the meal is expired
+    if (mealDate < today) {
+        return true;
+    }
+
+    // If the date is in the future, the meal is not expired
+    if (mealDate > today) {
+        return false;
+    }
+
+    // For today, check based on meal type and current hour
+    const currentHour = now.getHours();
+
+    switch (mealType.toLowerCase()) {
+        case 'breakfast':
+            return currentHour >= 10; // After 10:00 AM
+        case 'lunch':
+            return currentHour >= 15; // After 3:00 PM
+        case 'snacks':
+            return currentHour >= 19; // After 7:00 PM
+        case 'dinner':
+            return currentHour >= 22; // After 10:00 PM
+        default:
+            return false;
+    }
+}
+
 export async function fetchFilteredListings() {
     try {
         // Step 1: Get IDs of listings that have accepted bids
@@ -40,9 +72,10 @@ export async function fetchFilteredListings() {
                 .map(bid => bid.listing_id) || []
         );
 
-        // Step 4: Filter out listings with accepted bids
+        // Step 4: Filter out listings with accepted bids and expired meals
         const filteredListings = allListings.filter(
-            listing => !listingIdsWithAcceptedBids.has(listing.id)
+            listing => !listingIdsWithAcceptedBids.has(listing.id) &&
+                !isMealExpired(listing.date, listing.meal)
         );
 
         // Step 5: Return the filtered listings

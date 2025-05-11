@@ -9,16 +9,11 @@ import {
     Receipt,
     Wallet,
     CreditCard,
-    BarChart3,
-    LineChart as LineChartIcon,
-    PieChart as PieChartIcon
 } from "lucide-react"
 
 import {
     ChartContainer,
-    ChartTitle,
     ChartLegend,
-    ChartTooltip,
     Bar,
     BarChart,
     CartesianGrid,

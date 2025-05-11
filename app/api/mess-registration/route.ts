@@ -1,5 +1,4 @@
 import { NextRequest, NextResponse } from "next/server";
-import { cookies } from "next/headers";
 import { supabase } from "@/lib/supabaseClient";
 
 // API handler for proxying requests to the mess API

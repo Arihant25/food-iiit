@@ -29,6 +29,17 @@ To learn more about Next.js, take a look at the following resources:
 
 You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
 
+## Automated Cleanup
+
+The application includes an automated cleanup system that removes expired meal listings:
+
+- Listings are automatically deleted after the meal time has passed
+- Runs hourly through a cron job configured in `vercel.json`
+- Meal end times: Breakfast (10 AM), Lunch (3 PM), Snacks (7 PM), Dinner (10 PM)
+- This helps keep the listings page clean and only shows relevant available meals
+
+Run it manually with `npm run cleanup`.
+
 ## Deploy on Vercel
 
 The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.

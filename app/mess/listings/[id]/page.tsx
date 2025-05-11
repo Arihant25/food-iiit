@@ -7,6 +7,7 @@ import { supabase } from "@/lib/supabaseClient"
 import { toast } from "sonner"
 import { format } from "date-fns"
 import { CalendarDays, Clock, User, Phone, AlertCircle, ArrowLeft, Edit2, AlertTriangle, Share2 } from "lucide-react"
+import { isMealExpired } from "../fetch-listings"
 
 // Helper function to format dates consistently throughout the component
 const formatDate = (dateString: string) => {
@@ -107,6 +108,7 @@ export default function ListingDetailPage() {
     const [messMenu, setMessMenu] = useState<MessMenu | null>(null)
     const [loadingMenu, setLoadingMenu] = useState(false)
     const dayNames = ["sunday", "monday", "tuesday", "wednesday", "thursday", "friday", "saturday"]
+    const [isExpired, setIsExpired] = useState(false)
 
     useEffect(() => {
         if (id) {
@@ -183,6 +185,9 @@ export default function ListingDetailPage() {
     useEffect(() => {
         if (listing) {
             setNewMinPrice(listing.min_price.toString())
+
+            // Check if the meal is expired
+            setIsExpired(isMealExpired(listing.date, listing.meal))
         }
     }, [listing])
 
@@ -357,6 +362,12 @@ export default function ListingDetailPage() {
 
         if (!listing) {
             toast.error("Listing details are not available to place a bid.");
+            return;
+        }
+
+        // Check if the meal has expired
+        if (isExpired) {
+            toast.error("This meal has already passed and cannot be bid on.");
             return;
         }
 
@@ -855,7 +866,7 @@ export default function ListingDetailPage() {
     // Function to fetch mess menu
     const fetchMessMenu = async () => {
         if (!listing || !session?.user) return
-        
+
         try {
             setLoadingMenu(true)
             // Convert mess name to lowercase and validate it
@@ -865,13 +876,13 @@ export default function ListingDetailPage() {
                 console.error(`Invalid mess name: ${messName}`)
                 return
             }
-            
+
             const response = await fetch(`/api/mess-menu?mess=${messName}&userId=${session.user.rollNumber}`)
-            
+
             if (!response.ok) {
                 throw new Error(`Failed to fetch menu: ${response.status}`)
             }
-            
+
             const data = await response.json()
             setMessMenu(data.data)
         } catch (error) {
@@ -994,6 +1005,16 @@ export default function ListingDetailPage() {
                                     <span>{listing.seller.name}</span>
                                 </div>
 
+                                {/* Show expired warning if applicable */}
+                                {isExpired && (
+                                    <div className="bg-yellow-50 border border-yellow-200 rounded p-3 mb-4 flex items-center gap-2">
+                                        <AlertCircle className="h-5 w-5 text-yellow-500" />
+                                        <p className="text-yellow-700 text-sm">
+                                            This meal has already passed and the listing will be automatically removed soon.
+                                        </p>
+                                    </div>
+                                )}
+
                                 {/* Mess Menu Section */}
                                 <div className="border-t pt-4 mt-4">
                                     <h3 className="text-lg font-semibold mb-2">Menu for This Meal</h3>
@@ -1039,7 +1060,7 @@ export default function ListingDetailPage() {
                                 </div>
 
 
-                                {session?.user && session.user.rollNumber !== listing.seller_id && (
+                                {session?.user && session.user.rollNumber !== listing.seller_id && !isExpired && (
                                     <div className="border-t pt-4 mt-4">
                                         <h3 className="text-lg font-medium">Place a Bid</h3>
                                         <div className="flex items-center gap-2">
