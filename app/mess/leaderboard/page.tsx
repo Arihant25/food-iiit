@@ -24,7 +24,7 @@ export default function LeaderboardPage() {
     useEffect(() => {
         async function fetchLeaderboardData() {
             setIsLoading(true)
-            try {                
+            try {
                 // Fetch seller data from transaction_history
                 const { data: sellerData, error: sellerError } = await supabase
                     .from("transaction_history")
@@ -37,12 +37,12 @@ export default function LeaderboardPage() {
                     console.error("Error fetching seller stats:", sellerError)
                     return
                 }
-                
+
                 // Process seller data
                 const sellerMap = new Map<string, { id: string; name: string; count: number }>()
                 sellerData.forEach((item) => {
                     const sellerId = item.seller_id
-                    const sellerName = item.users?.name || "Unknown"
+                    const sellerName = item.users && item.users[0] && item.users[0].name || "Unknown"
 
                     if (sellerMap.has(sellerId)) {
                         sellerMap.get(sellerId)!.count += 1
@@ -54,7 +54,7 @@ export default function LeaderboardPage() {
                 // Convert map to array and sort by count (descending)
                 const processedSellerData = Array.from(sellerMap.values())
                     .sort((a, b) => b.count - a.count)
-                
+
                 setSellerStats(processedSellerData)
 
                 // Fetch buyer data from transaction_history
@@ -74,7 +74,7 @@ export default function LeaderboardPage() {
                 const buyerMap = new Map<string, { id: string; name: string; count: number }>()
                 buyerData.forEach((item) => {
                     const buyerId = item.buyer_id
-                    const buyerName = item.users?.name || "Unknown"
+                    const buyerName = item.users && item.users[0] && item.users[0].name || "Unknown"
 
                     if (buyerMap.has(buyerId)) {
                         buyerMap.get(buyerId)!.count += 1
@@ -189,10 +189,10 @@ function LeaderboardTable({ data, isLoading, type, currentUserId }: LeaderboardT
                 {data.map((user, index) => {
                     // For debugging, check both exact match and case-insensitive match
                     const exactMatch = currentUserId && user.id === currentUserId
-                    const caseInsensitiveMatch = currentUserId && 
+                    const caseInsensitiveMatch = currentUserId &&
                         String(user.id).toLowerCase() === String(currentUserId).toLowerCase()
                     const isCurrentUser = exactMatch || caseInsensitiveMatch
-                    
+
                     return (
                         <TableRow
                             key={user.id}

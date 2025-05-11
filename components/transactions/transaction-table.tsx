@@ -67,6 +67,7 @@ export function TransactionsTable({ data, userRollNumber }: DataTableProps) {
 
     // Format price to INR
     const formatPrice = (price: number | undefined) => {
+        if (price === undefined) return "N/A"
         return new Intl.NumberFormat('en-IN', {
             style: 'currency',
             currency: 'INR',

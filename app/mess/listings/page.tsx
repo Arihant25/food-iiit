@@ -122,7 +122,9 @@ export default function ListingsPage() {
                 (payload) => {
                     // When a bid changes, just update the affected listing's bid count
                     // without fetching all listings again
-                    const listingId = payload.new?.listing_id || payload.old?.listing_id
+                    const listingId =
+                        (payload.new && 'listing_id' in payload.new ? payload.new.listing_id : undefined) ||
+                        (payload.old && 'listing_id' in payload.old ? payload.old.listing_id : undefined)
 
                     if (listingId) {
                         if (payload.eventType === 'INSERT') {
@@ -415,30 +417,30 @@ export default function ListingsPage() {
         // Check if the listing date is in the past
         const currentDate = new Date();
         const listingDate = new Date(newListing.date);
-        
+
         // For comparing days (to see if it's a past date)
         const currentDateOnly = new Date(currentDate);
         currentDateOnly.setHours(0, 0, 0, 0);
         const listingDateOnly = new Date(listingDate);
         listingDateOnly.setHours(0, 0, 0, 0);
-        
+
         if (listingDateOnly < currentDateOnly) {
             toast.error("Cannot create a listing for a meal from the past");
             return;
         }
-        
+
         // Check time restrictions for same-day listings
         if (listingDateOnly.getTime() === currentDateOnly.getTime()) {
             const currentHour = currentDate.getHours();
             const currentMinutes = currentDate.getMinutes();
             const currentTimeInMinutes = timeToMinutes(currentHour, currentMinutes);
-            
+
             // Define cut-off times for each meal
             const breakfastCutoff = timeToMinutes(9, 30);  // 9:30 AM
             const lunchCutoff = timeToMinutes(14, 30);     // 2:30 PM
             const snacksCutoff = timeToMinutes(18, 30);    // 6:30 PM
             const dinnerCutoff = timeToMinutes(21, 30);    // 9:30 PM
-            
+
             // Time restrictions based on meal type
             if (newListing.meal === "Breakfast" && currentTimeInMinutes >= breakfastCutoff) {
                 toast.error("Cannot sell breakfast after 9:30 AM on the same day");

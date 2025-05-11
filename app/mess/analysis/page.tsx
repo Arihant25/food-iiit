@@ -104,7 +104,9 @@ export default function AnalysisPage() {
             setIsLoading(true)
             try {
                 // Fetch user's personal transaction data
-                await fetchUserSummary(currentUserId)
+                if (currentUserId) {
+                    await fetchUserSummary(currentUserId)
+                }
 
                 // Fetch overall analytics data
                 await fetchDailyTransactions()
