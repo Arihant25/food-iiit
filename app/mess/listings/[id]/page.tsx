@@ -266,7 +266,6 @@ export default function ListingDetailPage() {
             }
         } catch (error) {
             console.error("Error fetching listing:", error)
-            toast.error("Failed to load listing details")
         } finally {
             setLoading(false)
         }

@@ -493,6 +493,46 @@ export default function ListingsPage() {
             // Format the mess name appropriately (remove any -veg/-nonveg suffix)
             const messName = userMess.split('-')[0].charAt(0).toUpperCase() + userMess.split('-')[0].slice(1);
 
+            // Check if the user already has an active listing for this meal, date, and mess
+            const { data: existingListings, error: existingListingsError } = await supabase
+                .from("listings")
+                .select("id")
+                .eq("seller_id", session.user.rollNumber)
+                .eq("date", newListing.date)
+                .eq("meal", newListing.meal)
+                .eq("mess", messName);
+
+            if (existingListingsError) {
+                console.error("Error checking for existing listings:", existingListingsError);
+                toast.error("Failed to check for existing listings");
+                return;
+            }
+
+            if (existingListings && existingListings.length > 0) {
+                toast.error("You already have a listing for this meal, date, and mess");
+                return;
+            }
+
+            // Check if the user has already sold this meal in a transaction
+            const { data: existingTransactions, error: existingTransactionsError } = await supabase
+                .from("transaction_history")
+                .select("id")
+                .eq("seller_id", session.user.rollNumber)
+                .eq("date_of_transaction", newListing.date)
+                .eq("meal", newListing.meal)
+                .eq("mess", messName);
+
+            if (existingTransactionsError) {
+                console.error("Error checking for existing transactions:", existingTransactionsError);
+                toast.error("Failed to check for existing transactions");
+                return;
+            }
+
+            if (existingTransactions && existingTransactions.length > 0) {
+                toast.error("You have already sold this meal and cannot create another listing for it");
+                return;
+            }
+
             // Create the new listing in Supabase
             const { data, error } = await supabase
                 .from("listings")
