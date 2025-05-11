@@ -412,6 +412,49 @@ export default function ListingsPage() {
             return;
         }
 
+        // Check if the listing date is in the past
+        const currentDate = new Date();
+        const listingDate = new Date(newListing.date);
+        
+        // For comparing days (to see if it's a past date)
+        const currentDateOnly = new Date(currentDate);
+        currentDateOnly.setHours(0, 0, 0, 0);
+        const listingDateOnly = new Date(listingDate);
+        listingDateOnly.setHours(0, 0, 0, 0);
+        
+        if (listingDateOnly < currentDateOnly) {
+            toast.error("Cannot create a listing for a meal from the past");
+            return;
+        }
+        
+        // Check time restrictions for same-day listings
+        if (listingDateOnly.getTime() === currentDateOnly.getTime()) {
+            const currentHour = currentDate.getHours();
+            const currentMinutes = currentDate.getMinutes();
+            const currentTimeInMinutes = timeToMinutes(currentHour, currentMinutes);
+            
+            // Define cut-off times for each meal
+            const breakfastCutoff = timeToMinutes(9, 30);  // 9:30 AM
+            const lunchCutoff = timeToMinutes(14, 30);     // 2:30 PM
+            const snacksCutoff = timeToMinutes(18, 30);    // 6:30 PM
+            const dinnerCutoff = timeToMinutes(21, 30);    // 9:30 PM
+            
+            // Time restrictions based on meal type
+            if (newListing.meal === "Breakfast" && currentTimeInMinutes >= breakfastCutoff) {
+                toast.error("Cannot sell breakfast after 9:30 AM on the same day");
+                return;
+            } else if (newListing.meal === "Lunch" && currentTimeInMinutes >= lunchCutoff) {
+                toast.error("Cannot sell lunch after 2:30 PM on the same day");
+                return;
+            } else if (newListing.meal === "Snacks" && currentTimeInMinutes >= snacksCutoff) {
+                toast.error("Cannot sell snacks after 5:30 PM on the same day");
+                return;
+            } else if (newListing.meal === "Dinner" && currentTimeInMinutes >= dinnerCutoff) {
+                toast.error("Cannot sell dinner after 9:30 PM on the same day");
+                return;
+            }
+        }
+
         // Inform the user if they're listing for free
         if (newListing.min_price === 0) {
             toast.info("You're listing this meal with no minimum price (₹0)");
@@ -494,6 +537,11 @@ export default function ListingsPage() {
             currency: 'INR',
             minimumFractionDigits: 0,
         }).format(price)
+    }
+
+    // Helper function to convert time to minutes since midnight
+    const timeToMinutes = (hours: number, minutes: number) => {
+        return hours * 60 + minutes;
     }
 
     return (
@@ -746,6 +794,7 @@ export default function ListingsPage() {
                                     type="date"
                                     value={newListing.date}
                                     onChange={handleInputChange}
+                                    min={new Date().toISOString().split('T')[0]} // Prevent selecting past dates
                                     required
                                 />
                             </div>
