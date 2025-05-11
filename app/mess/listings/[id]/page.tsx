@@ -52,6 +52,38 @@ interface Bid {
     }
 }
 
+interface MenuItem {
+    category: string
+    item: string
+}
+
+interface MessMenu {
+    days: Record<string, {
+        breakfast: MenuItem[]
+        lunch: MenuItem[]
+        dinner: MenuItem[]
+    }>
+    updated_at: string
+    effective_from: string
+    mess: string
+}
+
+interface MenuItem {
+    category: string
+    item: string
+}
+
+interface MessMenu {
+    days: Record<string, {
+        breakfast: MenuItem[]
+        lunch: MenuItem[]
+        dinner: MenuItem[]
+    }>
+    updated_at: string
+    effective_from: string
+    mess: string
+}
+
 export default function ListingDetailPage() {
     const router = useRouter()
     const { id } = useParams() as { id: string }
@@ -72,6 +104,9 @@ export default function ListingDetailPage() {
     const [showLowBidConfirmation, setShowLowBidConfirmation] = useState(false)
     const [showUnmarkBidConfirmation, setShowUnmarkBidConfirmation] = useState(false)
     const [bidToUnmark, setBidToUnmark] = useState<string | null>(null)
+    const [messMenu, setMessMenu] = useState<MessMenu | null>(null)
+    const [loadingMenu, setLoadingMenu] = useState(false)
+    const dayNames = ["sunday", "monday", "tuesday", "wednesday", "thursday", "friday", "saturday"]
 
     useEffect(() => {
         if (id) {
@@ -817,6 +852,43 @@ export default function ListingDetailPage() {
         toast.success('Opening WhatsApp to share listing')
     }
 
+    // Function to fetch mess menu
+    const fetchMessMenu = async () => {
+        if (!listing || !session?.user) return
+        
+        try {
+            setLoadingMenu(true)
+            // Convert mess name to lowercase and validate it
+            const messName = listing.mess.toLowerCase()
+            // Check if mess name is valid
+            if (!['north', 'south', 'yuktahar', 'kadamba'].includes(messName)) {
+                console.error(`Invalid mess name: ${messName}`)
+                return
+            }
+            
+            const response = await fetch(`/api/mess-menu?mess=${messName}&userId=${session.user.rollNumber}`)
+            
+            if (!response.ok) {
+                throw new Error(`Failed to fetch menu: ${response.status}`)
+            }
+            
+            const data = await response.json()
+            setMessMenu(data.data)
+        } catch (error) {
+            console.error("Error fetching mess menu:", error)
+            // Don't show error toast as this is not critical
+        } finally {
+            setLoadingMenu(false)
+        }
+    }
+
+    // Fetch mess menu when listing is loaded
+    useEffect(() => {
+        if (listing) {
+            fetchMessMenu()
+        }
+    }, [listing])
+
     return (
         <div className="container mx-auto px-4 py-6">
             <div className="flex items-center gap-2 mb-6">
@@ -831,12 +903,12 @@ export default function ListingDetailPage() {
                 </Button>
             </div>
 
-            <PageHeading 
-                title="Listing Details" 
-                subtitle={session?.user?.rollNumber === listing?.seller_id 
-                    ? "Someday you'll find the one (buyer)" 
+            <PageHeading
+                title="Listing Details"
+                subtitle={session?.user?.rollNumber === listing?.seller_id
+                    ? "Someday you'll find the one (buyer)"
                     : "Bid higher, it always works"
-                } 
+                }
             />
 
             {loading ? (
@@ -920,6 +992,50 @@ export default function ListingDetailPage() {
                                 <div className="flex items-center gap-2 mb-2">
                                     <User className="h-5 w-5 text-muted-foreground flex-shrink-0" />
                                     <span>{listing.seller.name}</span>
+                                </div>
+
+                                {/* Mess Menu Section */}
+                                <div className="border-t pt-4 mt-4">
+                                    <h3 className="text-lg font-semibold mb-2">Menu for This Meal</h3>
+
+                                    {loadingMenu ? (
+                                        <p className="text-sm text-muted-foreground">Loading menu...</p>
+                                    ) : messMenu ? (
+                                        <div className="space-y-2">
+                                            {/* Get the menu for the day of the week that matches the listing's date */}
+                                            {(() => {
+                                                const listingDate = new Date(listing.date);
+                                                const dayOfWeek = dayNames[listingDate.getDay()];
+                                                const dayMenu = messMenu.days[dayOfWeek];
+
+                                                if (!dayMenu) {
+                                                    return <p className="text-sm text-muted-foreground">No menu available for this day</p>;
+                                                }
+
+                                                const mealItems = dayMenu[listing.meal.toLowerCase() as keyof typeof dayMenu];
+
+                                                if (!mealItems || mealItems.length === 0) {
+                                                    return <p className="text-sm text-muted-foreground">No menu available for {listing.meal}</p>;
+                                                }
+
+                                                return (
+                                                    <div className="grid grid-cols-1 gap-1">
+                                                        {mealItems.map((item, index) => (
+                                                            <div key={index} className="text-sm">
+                                                                {item.item ? (
+                                                                    <>
+                                                                        <span className="font-medium">{item.category}:</span> {item.item}
+                                                                    </>
+                                                                ) : null}
+                                                            </div>
+                                                        ))}
+                                                    </div>
+                                                );
+                                            })()}
+                                        </div>
+                                    ) : (
+                                        <p className="text-sm text-muted-foreground">Menu information unavailable</p>
+                                    )}
                                 </div>
 
 
