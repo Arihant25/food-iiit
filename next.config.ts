@@ -1,9 +1,20 @@
 import type { NextConfig } from "next";
+import { webpack } from "next/dist/compiled/webpack/webpack";
 
 const nextConfig: NextConfig = {
   // Disable ESLint during builds and development
   eslint: {
     ignoreDuringBuilds: true,
+  },
+  // Add webpack config to handle punycode deprecation
+  webpack: (config, { isServer }) => {
+    // Replace punycode with a fallback if it's being used
+    config.resolve.fallback = {
+      ...config.resolve.fallback,
+      punycode: false,
+    };
+
+    return config;
   },
   async headers() {
     return [

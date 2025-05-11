@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, Suspense } from "react"
 import { useSession } from "next-auth/react"
 import { useRouter, useSearchParams } from "next/navigation"
 import { supabase } from "@/lib/supabaseClient"
@@ -83,7 +83,7 @@ interface Transaction {
     seller_name?: string
 }
 
-export default function DashboardPage() {
+function Dashboard() {
     const { data: session } = useSession()
     const router = useRouter()
     const searchParams = useSearchParams()
@@ -940,5 +940,14 @@ export default function DashboardPage() {
                 </TabsContent>
             </Tabs>
         </div>
+    )
+}
+
+// Export the dashboard component wrapped in Suspense
+export default function DashboardPage() {
+    return (
+        <Suspense fallback={<div className="flex justify-center items-center h-64">Loading...</div>}>
+            <Dashboard />
+        </Suspense>
     )
 }
