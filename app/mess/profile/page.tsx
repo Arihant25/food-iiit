@@ -139,9 +139,9 @@ export default function ProfilePage() {
                                     <Pencil className="h-4 w-4 mr-2" />
                                     Edit Profile
                                 </Button>
-                                <Button 
-                                    onClick={() => signOut({ callbackUrl: '/' })} 
-                                    size="sm" 
+                                <Button
+                                    onClick={() => signOut({ callbackUrl: '/' })}
+                                    size="sm"
                                     variant="noShadow"
                                 >
                                     <LogOut className="h-4 w-4 mr-2" />

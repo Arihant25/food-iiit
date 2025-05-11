@@ -15,7 +15,6 @@ export function LearnMoreButton({ targetId }: LearnMoreButtonProps) {
     return (
         <Button
             variant="neutral"
-            size="lg"
             onClick={handleScroll}
         >
             Learn More <ArrowRight />

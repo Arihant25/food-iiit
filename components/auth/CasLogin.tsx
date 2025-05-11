@@ -19,17 +19,27 @@ export default function CasLogin() {
         if (ticket) {
             setIsLoading(true);
             // Use the current URL's origin + path without the query parameters as service
-            const currentUrl = new URL(window.location.href);
-            currentUrl.search = ""; // Remove query parameters
+            const currentUrl = new URL(window.location.origin);
+            currentUrl.pathname = "/"; // Ensure path is just the root
             const service = currentUrl.toString();
 
             // Call the NextAuth API with the ticket
             signIn("credentials", {
                 ticket,
                 service, // Pass the service URL to match what was sent to CAS
-                redirect: true,
-                callbackUrl: "/mess",
-            }).catch((err) => {
+                redirect: false,
+            })
+            .then((result) => {
+                if (result?.error) {
+                    console.error("Authentication error:", result.error);
+                    setError(`Authentication failed: ${result.error}`);
+                    setIsLoading(false);
+                } else if (result?.ok) {
+                    // Successfully authenticated, redirect to mess page
+                    router.push("/mess");
+                }
+            })
+            .catch((err) => {
                 console.error("Authentication error:", err);
                 setError("Authentication failed. Please try again.");
                 setIsLoading(false);
