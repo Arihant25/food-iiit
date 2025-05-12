@@ -17,42 +17,10 @@ export async function GET(request: NextRequest) {
     }
 
     try {
-        // Get the user's API key from the users table
-        let apiKey = null;
-        if (userId) {
-            const { data, error } = await supabase
-                .from('users')
-                .select('api_key')
-                .eq('roll_number', userId)
-                .single();
-
-            if (error) {
-                console.error("Error fetching user API key:", error);
-                return NextResponse.json(
-                    { error: "User API key not found" },
-                    { status: 401 }
-                );
-            } else if (data?.api_key) {
-                apiKey = data.api_key;
-            } else {
-                return NextResponse.json(
-                    { error: "User API key not set" },
-                    { status: 401 }
-                );
-            }
-        } else {
-            return NextResponse.json(
-                { error: "User ID is required" },
-                { status: 400 }
-            );
-        }
-
-        console.log("Using API Key for user:", userId);
-
-        // Forward the request to the mess menu API with API key
+        // Forward the request to the mess menu API
         const messApiUrl = `https://mess.iiit.ac.in/api/mess/menu/${mess}`;
         const headers: HeadersInit = {
-            "Authorization": apiKey,
+            // Note that the menu API does not require an API key
             "Content-Type": "application/json"
         };
 
@@ -60,18 +28,6 @@ export async function GET(request: NextRequest) {
             headers,
             credentials: "include",
         });
-
-        // Handle various response statuses
-        if (response.status === 401) {
-            console.error("Unauthorized access to mess API. Invalid API key.");
-            return NextResponse.json(
-                {
-                    error: "Invalid API key",
-                    loginRequired: true
-                },
-                { status: 401 }
-            );
-        }
 
         // If we get a successful response, extract the data
         const data = await response.json();
