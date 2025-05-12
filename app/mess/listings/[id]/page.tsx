@@ -106,7 +106,6 @@ export default function ListingDetailPage() {
     const [bidToUnmark, setBidToUnmark] = useState<string | null>(null)
     const [messMenu, setMessMenu] = useState<MessMenu | null>(null)
     const [loadingMenu, setLoadingMenu] = useState(false)
-    const [hasApiKey, setHasApiKey] = useState(false)
     const dayNames = ["sunday", "monday", "tuesday", "wednesday", "thursday", "friday", "saturday"]
     const [isExpired, setIsExpired] = useState(false)
 
@@ -954,17 +953,11 @@ export default function ListingDetailPage() {
             const response = await fetch(`/api/mess-menu?mess=${messName}&userId=${session.user.rollNumber}`)
 
             if (!response.ok) {
-                // If we get a 401 status, it means the user doesn't have an API key
-                if (response.status === 401) {
-                    setHasApiKey(false)
-                    return
-                }
                 throw new Error(`Failed to fetch menu: ${response.status}`)
             }
 
             const data = await response.json()
             setMessMenu(data.data)
-            setHasApiKey(true)
         } catch (error) {
             console.error("Error fetching mess menu:", error)
             // Don't show error toast as this is not critical
@@ -1095,52 +1088,49 @@ export default function ListingDetailPage() {
                                     </div>
                                 )}
 
-                                {/* Mess Menu Section - only show if user has API key */}
-                                {hasApiKey && (
-                                    <div className="border-t pt-4 mt-4">
-                                        <h3 className="text-lg font-semibold mb-2">Menu for This Meal</h3>
+                                {/* Mess Menu Section */}
+                                <div className="border-t pt-4 mt-4">
+                                    <h3 className="text-lg font-semibold mb-2">Menu for This Meal</h3>
 
-                                        {loadingMenu ? (
-                                            <p className="text-sm text-muted-foreground">Loading menu...</p>
-                                        ) : messMenu ? (
-                                            <div className="space-y-2">
-                                                {/* Get the menu for the day of the week that matches the listing's date */}
-                                                {(() => {
-                                                    const listingDate = new Date(listing.date);
-                                                    const dayOfWeek = dayNames[listingDate.getDay()];
-                                                    const dayMenu = messMenu.days[dayOfWeek];
+                                    {loadingMenu ? (
+                                        <p className="text-sm text-muted-foreground">Loading menu...</p>
+                                    ) : messMenu ? (
+                                        <div className="space-y-2">
+                                            {/* Get the menu for the day of the week that matches the listing's date */}
+                                            {(() => {
+                                                const listingDate = new Date(listing.date);
+                                                const dayOfWeek = dayNames[listingDate.getDay()];
+                                                const dayMenu = messMenu.days[dayOfWeek];
 
-                                                    if (!dayMenu) {
-                                                        return <p className="text-sm text-muted-foreground">No menu available for this day</p>;
-                                                    }
+                                                if (!dayMenu) {
+                                                    return <p className="text-sm text-muted-foreground">No menu available for this day</p>;
+                                                }
 
-                                                    const mealItems = dayMenu[listing.meal.toLowerCase() as keyof typeof dayMenu];
+                                                const mealItems = dayMenu[listing.meal.toLowerCase() as keyof typeof dayMenu];
 
-                                                    if (!mealItems || mealItems.length === 0) {
-                                                        return <p className="text-sm text-muted-foreground">No menu available for {listing.meal}</p>;
-                                                    }
+                                                if (!mealItems || mealItems.length === 0) {
+                                                    return <p className="text-sm text-muted-foreground">No menu available for {listing.meal}</p>;
+                                                }
 
-                                                    return (
-                                                        <div className="grid grid-cols-1 gap-1">
-                                                            {mealItems.map((item, index) => (
-                                                                <div key={index} className="text-sm">
-                                                                    {item.item ? (
-                                                                        <>
-                                                                            <span className="font-medium">{item.category}:</span> {item.item}
-                                                                        </>
-                                                                    ) : null}
-                                                                </div>
-                                                            ))}
-                                                        </div>
-                                                    );
-                                                })()}
-                                            </div>
-                                        ) : (
-                                            <p className="text-sm text-muted-foreground">Menu information unavailable</p>
-                                        )}
-                                    </div>
-                                )}
-
+                                                return (
+                                                    <div className="grid grid-cols-1 gap-1">
+                                                        {mealItems.map((item, index) => (
+                                                            <div key={index} className="text-sm">
+                                                                {item.item ? (
+                                                                    <>
+                                                                        <span className="font-medium">{item.category}:</span> {item.item}
+                                                                    </>
+                                                                ) : null}
+                                                            </div>
+                                                        ))}
+                                                    </div>
+                                                );
+                                            })()}
+                                        </div>
+                                    ) : (
+                                        <p className="text-sm text-muted-foreground">Menu information unavailable</p>
+                                    )}
+                                </div>
 
                                 {session?.user && session.user.rollNumber !== listing.seller_id && !isExpired && (
                                     <div className="border-t pt-4 mt-4">
