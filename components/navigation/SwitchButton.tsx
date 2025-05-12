@@ -5,6 +5,7 @@ import { usePathname, useRouter } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
 import { useEffect, useState } from "react";
 import React from "react";
+import { saveLastVisitedPage } from "@/lib/lastVisited";
 
 export default function SwitchButton() {
     const pathname = usePathname();
@@ -34,6 +35,9 @@ export default function SwitchButton() {
 
         // Define the target URL
         const targetUrl = isCanteenPage ? "/mess" : "/canteen";
+
+        // Save the target page to the cookie before navigating
+        saveLastVisitedPage(isCanteenPage ? "mess" : "canteen");
 
         // After animation completes, navigate to the target page
         setTimeout(() => {

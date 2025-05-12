@@ -83,8 +83,6 @@ export async function GET(request: NextRequest) {
             );
         }
 
-        console.log(`Found ${expiredListingIds.length} expired listings to delete`);
-
         // Delete expired listings
         const { error: deleteError } = await supabase
             .from("listings")

@@ -67,12 +67,10 @@ const handler = NextAuth({
                     const validationUrl = `https://login.iiit.ac.in/cas/serviceValidate?ticket=${ticket}&service=${encodeURIComponent(
                         service
                     )}`;
-                    console.log("Validating CAS ticket with URL:", validationUrl);
 
                     // Validate the ticket with the CAS server
                     const response = await fetch(validationUrl);
                     const xmlResponse = await response.text();
-                    console.log("CAS XML Response:", xmlResponse);
 
                     // Parse the XML response
                     const result = (await parseStringPromise(xmlResponse)) as CASResponse;
@@ -122,7 +120,19 @@ const handler = NextAuth({
     ],
     session: {
         strategy: "jwt",
-        maxAge: 24 * 60 * 60, // 1 day
+        maxAge: 30 * 24 * 60 * 60, // 30 days
+    },
+    cookies: {
+        sessionToken: {
+            name: `next-auth.session-token`,
+            options: {
+                httpOnly: true,
+                sameSite: "lax",
+                path: "/",
+                secure: process.env.NODE_ENV === "production",
+                maxAge: 30 * 24 * 60 * 60, // 30 days
+            },
+        },
     },
     callbacks: {
         async jwt({ token, user }) {
@@ -147,7 +157,6 @@ const handler = NextAuth({
 
                     if (!existingUser) {
                         // User doesn't exist, add them to the database
-                        console.log(`Adding new user to database: ${user.name} (${user.rollNumber})`);
                         const { error: insertError } = await supabase
                             .from('users')
                             .insert({

@@ -59,8 +59,6 @@ export async function GET(request: NextRequest) {
             );
         }
 
-        console.log("Using API Key for user:", userId);
-
         // Forward the request to the mess API with API key
         const messApiUrl = `https://mess.iiit.ac.in/api/registration?meal=${meal}&date=${formattedDate}`;
         const headers: HeadersInit = {

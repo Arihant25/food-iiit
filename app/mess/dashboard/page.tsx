@@ -129,7 +129,6 @@ function Dashboard() {
                     table: 'bids',
                 },
                 (payload) => {
-                    console.log('Bids change received:', payload)
                     // Fetch user bids and listings to ensure data is up-to-date
                     fetchUserBids()
                     fetchUserListings()
@@ -148,7 +147,6 @@ function Dashboard() {
                     table: 'listings',
                 },
                 (payload) => {
-                    console.log('Listings change received:', payload)
                     fetchUserListings()
                 }
             )
@@ -165,7 +163,6 @@ function Dashboard() {
                     table: 'transaction_history',
                 },
                 (payload) => {
-                    console.log('Transaction change received:', payload)
                     fetchTransactionHistory()
                     fetchUserListings()
                     fetchUserBids()
@@ -184,7 +181,6 @@ function Dashboard() {
                     table: 'purchases',
                 },
                 (payload) => {
-                    console.log('Purchase change received:', payload)
                     fetchMyPurchases()
                 }
             )

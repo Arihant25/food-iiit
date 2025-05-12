@@ -125,7 +125,6 @@ export default function ListingDetailPage() {
                         filter: `id=eq.${id}`
                     },
                     (payload) => {
-                        console.log('Listing change received:', payload)
                         fetchListing()
                     }
                 )
@@ -141,8 +140,6 @@ export default function ListingDetailPage() {
                         filter: `listing_id=eq.${id}`
                     },
                     (payload) => {
-                        console.log('Bids change received:', payload)
-
                         // Smart handling of bid changes
                         if (payload.eventType === 'INSERT') {
                             // For new bids, just fetch the new bid information
@@ -180,8 +177,6 @@ export default function ListingDetailPage() {
                         filter: `id=eq.${id}`
                     },
                     (payload) => {
-                        console.log('Listing deleted:', payload)
-
                         // If the user is not the seller or buyer, redirect to listings
                         if (session?.user?.rollNumber) {
                             // Check if this user is the buyer from our session storage

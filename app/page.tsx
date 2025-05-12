@@ -1,20 +1,39 @@
-import { Metadata } from "next";
+"use client";
+
 import CasLogin from "@/components/auth/CasLogin";
-import { Suspense } from "react";
+import { Suspense, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { PageHeading } from "@/components/ui/page-heading";
 import Marquee from "@/components/ui/marquee";
 import { MessIcon } from "@/components/ui/mess-icon";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import { ArrowRight, Utensils, Star, Calendar, ActivitySquare, TrendingUp, Users } from "lucide-react";
+import { Utensils, Star, Calendar, ActivitySquare, TrendingUp, Users } from "lucide-react";
 import { LearnMoreButton } from "@/components/ui/learn-more-button";
-
-export const metadata: Metadata = {
-  title: "Food@IIIT",
-  description: "The one stop shop for all things food at IIIT Hyderabad",
-};
+import { useSession } from "next-auth/react";
+import { useRouter } from "next/navigation";
+import { getLastVisitedPage } from "@/lib/lastVisited";
 
 export default function Home() {
+  const { data: session, status } = useSession();
+  const router = useRouter();
+
+  useEffect(() => {
+    if (status === "authenticated" && session) {
+      const lastVisited = getLastVisitedPage();
+      router.push(`/${lastVisited}`);
+    }
+  }, [status, session, router]);
+
+  // If loading or authenticated and redirecting, show a loading state or null
+  if (status === "loading" || (status === "authenticated" && session)) {
+    return (
+      <div className="min-h-screen flex flex-col items-center justify-center">
+        <p>Loading...</p>
+      </div>
+    );
+  }
+
+  // If not authenticated, show the landing page content
   return (
     <div className="min-h-screen flex flex-col">
       {/* Hero Section */}
