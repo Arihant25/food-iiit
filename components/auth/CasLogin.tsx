@@ -33,8 +33,8 @@ export default function CasLogin() {
                 if (result?.error) {
                     setIsLoading(false);
                 } else if (result?.ok) {
-                    // Successfully authenticated, redirect to mess page
-                    router.push("/mess");
+                    // Successfully authenticated
+                    router.push("/canteen");
                 }
             })
             .catch((err) => {
